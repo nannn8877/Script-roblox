@@ -47,27 +47,26 @@ local function TPFlash()
         return
     end
 
-    local target = getTarget("主要部件") -- 🔁 เปลี่ยนชื่อได้
+    local target = getTarget("主要部件") -- 🔁 ชื่อ object
 
     if not target then
         warn("❌ หา object ไม่เจอ!")
         return
     end
 
-    print("✅ เจอ object:", target:GetFullName())
-
     isTeleporting = true
 
     local originalCFrame = root.CFrame
 
-    -- 📌 offset ลง
-    local offset = Vector3.new(0, -5, 0)
+    -- 📌 ปรับ Y (ลงใต้)
+    local offset = Vector3.new(0, -20, 0)
     local targetCFrame = target.CFrame + offset
 
     -- ⚡ วาปไป
     root.CFrame = targetCFrame
 
-    task.wait(0.1)
+    -- ⏱ หน่วง (ปรับได้)
+    task.wait(0.25)
 
     -- ⚡ วาปกลับ
     root.CFrame = originalCFrame
@@ -76,6 +75,28 @@ local function TPFlash()
 end
 
 -- =========================
--- 🔹 เรียกใช้
+-- 🔹 GUI
 -- =========================
-TPFlash()
+local gui = Instance.new("ScreenGui")
+gui.Name = "TP_UI"
+gui.ResetOnSpawn = false
+gui.Parent = Player:WaitForChild("PlayerGui")
+
+local btn = Instance.new("TextButton")
+btn.Parent = gui
+btn.Size = UDim2.new(0, 200, 0, 50)
+btn.Position = UDim2.new(0.5, -100, 0.85, 0)
+btn.Text = "TP TO OBJECT"
+btn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+btn.TextColor3 = Color3.fromRGB(255,255,255)
+btn.TextSize = 16
+
+local corner = Instance.new("UICorner", btn)
+corner.CornerRadius = UDim.new(0, 10)
+
+-- 🔹 กดปุ่ม = วาป
+btn.MouseButton1Click:Connect(function()
+    TPFlash()
+end)
+
+print("TP GUI Loaded ✅")
