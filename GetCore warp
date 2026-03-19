@@ -5,27 +5,7 @@ local Player = Players.LocalPlayer
 
 local isTeleporting = false
 
--- =========================
--- 🔹 ซ่อนชื่อ
--- =========================
-local function hideName(char)
-    local hum = char:WaitForChild("Humanoid")
-
-    hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-    hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
-end
-
-Player.CharacterAdded:Connect(function(char)
-    hideName(char)
-end)
-
-if Player.Character then
-    hideName(Player.Character)
-end
-
--- =========================
 -- 🔹 หา target
--- =========================
 local function getTarget(name)
     local obj = workspace:FindFirstChild(name, true)
     if not obj then return nil end
@@ -37,10 +17,7 @@ local function getTarget(name)
     return obj
 end
 
--- =========================
--- 🔹 วาปไป + กลับ
--- =========================
-local function TPFlash()
+-- 🔹 วาปไป + กลับ (ปรับ Y)
 local function TPFlash()
     if isTeleporting then return end
 
@@ -72,7 +49,5 @@ local function TPFlash()
     isTeleporting = false
 end
 
--- =========================
 -- 🔹 เรียกใช้
--- =========================
 TPFlash()
