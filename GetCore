@@ -1,4 +1,4 @@
-repeat task.wait(1) until game:IsLoaded() and game.Players.LocalPlayer
+WWWosk.wait(1) until game:IsLoaded() and game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -55,7 +55,7 @@ TpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 TpButton.Position = UDim2.new(0.1, 0, 0.28, 0)
 TpButton.Size = UDim2.new(0.8, 0, 0, 35)
 TpButton.Font = Enum.Font.GothamBold
-TpButton.Text = "TP to WWW"
+TpButton.Text = "TP to Core"
 TpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 TpButton.TextSize = 14
 
@@ -155,11 +155,29 @@ TpButton.MouseButton1Click:Connect(function()
     TpButton.BackgroundColor3 = Color3.fromRGB(100, 50, 0)
 
     local target = 主要部件
-local root = game.Players.LocalPlayer.Character.HumanoidRootPart
+    local root = game.Players.LocalPlayer.Character.HumanoidRootPart
 
-local TweenService = game:GetService("TweenService")
+    local bV = Instance.new("BodyVelocity")
+    bV.Velocity = Vector3.new(0, 0, 0)
+    bV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bV.Parent = root
 
-local tween = TweenService:Create(root, TweenInfo.new(1), {
+    local bG = Instance.new("BodyGyro")
+    bG.P = 9e4
+    bG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bG.CFrame = root.CFrame
+    bG.Parent = root
+
+    local noclipLoop = RunService.Stepped:Connect(function()
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+    local TweenService = game:GetService("TweenService")
+
+    local tween = TweenService:Create(root, TweenInfo.new(1), {
     CFrame = target.CFrame
 })
 
