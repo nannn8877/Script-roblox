@@ -47,7 +47,9 @@ local function TPFlash()
         return
     end
 
-    local target = getTarget("主要部件") -- 🔁 ชื่อ object
+    local target = workspace:WaitForChild("单位对象")
+    :WaitForChild("水晶")
+    :WaitForChild("HumanoidRootPart")
 
     if not target then
         warn("❌ หา object ไม่เจอ!")
