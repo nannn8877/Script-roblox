@@ -63,6 +63,26 @@ local remote3 = ReplicatedStorage
     :WaitForChild("\230\141\144\231\140\174")
 
 -- =========================
+-- 🔹 Remote A ใหม่ (args 1-5, แต่ละตัว 3 ครั้ง + Vector2)
+-- =========================
+
+local remoteA = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\230\175\143\230\151\165\228\187\187\229\138\161")
+    :WaitForChild("\233\162\134\229\143\150\229\165\150\229\138\177")
+
+-- =========================
+-- 🔹 Remote B ใหม่ (ยิง 3 ครั้ง ไม่มี args)
+-- =========================
+
+local remoteB = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\232\189\172\231\155\152")
+    :WaitForChild("\230\138\189\229\165\150")
+
+-- =========================
 -- 🔹 Event เมื่อกดปุ่ม
 -- =========================
 button.MouseButton1Click:Connect(function()
@@ -92,11 +112,27 @@ button.MouseButton1Click:Connect(function()
         task.wait(0.05)
     end
 
-    -- 🔥 5. Remote3 (ยิง 5 ครั้งท้ายสุด)
+    -- 🔥 5. Remote3 (ยิง 5 ครั้ง)
     for i = 1, 5 do
         remote3:FireServer()
         task.wait(0.05)
     end
 
-    print("✅ Collect + Mailbox + All Remote Complete")
+    -- 🔥 6. Remote A (1-5, แต่ละตัวยิง 3 ครั้ง + Vector2)
+    local vecA = Vector2.new(643.2603759765625, 306.132568359375)
+    for num = 1, 5 do
+        for rep = 1, 3 do
+            remoteA:FireServer(num, vecA)
+            task.wait(0.05)
+        end
+    end
+
+    -- 🔥 7. Remote B (ยิง 3 ครั้ง)
+    for i = 1, 3 do
+        remoteB:FireServer()
+        task.wait(0.05)
+    end
+
+    print("✅ All Complete")
+
 end)
