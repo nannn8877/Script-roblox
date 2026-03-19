@@ -2,13 +2,60 @@ repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
 local Player = game.Players.LocalPlayer
 
 local isTweening = false
+local noclipEnabled = false
+local noclipLoop
 
--- ฟังก์ชันหา target (รองรับ nested + Model)
+-- =========================
+-- 🔹 Noclip Toggle
+-- =========================
+local function setNoclip(state)
+    noclipEnabled = state
+
+    if noclipEnabled then
+        noclipLoop = RunService.Stepped:Connect(function()
+            local char = Player.Character
+            if not char then return end
+
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanCollide = false
+                end
+            end
+        end)
+    else
+        if noclipLoop then
+            noclipLoop:Disconnect()
+            noclipLoop = nil
+        end
+
+        local char = Player.Character
+        if char then
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanCollide = true
+                end
+            end
+        end
+    end
+end
+
+-- กด N เปิด/ปิด noclip
+UIS.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.N then
+        setNoclip(not noclipEnabled)
+        print("Noclip:", noclipEnabled)
+    end
+end)
+
+-- =========================
+-- 🔹 หา target
+-- =========================
 local function getTarget(name)
-    local obj = workspace:FindFirstChild(name, true) -- หาแบบลึกทั้งแมพ
+    local obj = workspace:FindFirstChild(name, true)
     if not obj then return nil end
 
     if obj:IsA("Model") then
@@ -18,7 +65,9 @@ local function getTarget(name)
     return obj
 end
 
--- ปุ่มกด (เรียกใช้ได้เลย)
+-- =========================
+-- 🔹 Tween ไปหา object
+-- =========================
 local function TPToTarget()
     if isTweening then return end
 
@@ -27,16 +76,17 @@ local function TPToTarget()
 
     local target = getTarget("主要部件")
     if not target then
-        warn("หา object ไม่เจอ หรือไม่มี BasePart!")
+        warn("หา object ไม่เจอ!")
         return
     end
 
     isTweening = true
+    setNoclip(true) -- เปิด noclip อัตโนมัติ
 
     -- Body movers
     local bV = Instance.new("BodyVelocity")
     bV.MaxForce = Vector3.new(9e9,9e9,9e9)
-    bV.Velocity = Vector3.new(0,-50,0)
+    bV.Velocity = Vector3.new(0,0,0)
     bV.Parent = root
 
     local bG = Instance.new("BodyGyro")
@@ -45,17 +95,7 @@ local function TPToTarget()
     bG.CFrame = root.CFrame
     bG.Parent = root
 
-    -- noclip
-    local noclipLoop
-    noclipLoop = RunService.Stepped:Connect(function()
-        for _, v in pairs(char:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.CanCollide = false
-            end
-        end
-    end)
-
-    -- tween ไปหา object
+    -- tween
     local tween = TweenService:Create(root, TweenInfo.new(1), {
         CFrame = target.CFrame
     })
@@ -63,21 +103,17 @@ local function TPToTarget()
     tween:Play()
 
     tween.Completed:Connect(function()
-        if noclipLoop then noclipLoop:Disconnect() end
         if bV then bV:Destroy() end
         if bG then bG:Destroy() end
 
-        -- เปิด collide กลับ
-        for _, v in pairs(char:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.CanCollide = true
-            end
-        end
-
+        setNoclip(false) -- ปิด noclip หลังเสร็จ
         isTweening = false
+
         print("TP สำเร็จ")
     end)
 end
 
--- เรียกใช้ (ลองกดรันได้เลย)
+-- =========================
+-- 🔹 เรียกใช้งาน
+-- =========================
 TPToTarget()
