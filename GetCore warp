@@ -6,75 +6,76 @@ local Player = Players.LocalPlayer
 local isTeleporting = false
 
 -- =========================
--- 🔹 ซ่อนชื่อ + หลอดเลือด
+-- 🔹 ซ่อนชื่อ
 -- =========================
 local function hideName(char)
     local hum = char:WaitForChild("Humanoid")
-
     hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
     hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 end
 
-Player.CharacterAdded:Connect(function(char)
-    hideName(char)
-end)
-
-if Player.Character then
-    hideName(Player.Character)
-end
+Player.CharacterAdded:Connect(hideName)
+if Player.Character then hideName(Player.Character) end
 
 -- =========================
--- 🔹 หา target (รองรับลึก + Model)
+-- 🔹 หา target (ลึก + รองรับ Model)
 -- =========================
 local function getTarget(name)
-    local obj = workspace:FindFirstChild(name, true)
-    if not obj then return nil end
-
-    if obj:IsA("Model") then
-        obj = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj.Name == name then
+            if obj:IsA("BasePart") then
+                return obj
+            elseif obj:IsA("Model") then
+                return obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            end
+        end
     end
-
-    return obj
+    return nil
 end
 
 -- =========================
--- 🔹 วาปไป + กลับ (Y -20)
+-- 🔹 วาป
 -- =========================
 local function TPFlash()
     if isTeleporting then return end
 
     local char = Player.Character or Player.CharacterAdded:Wait()
-    local root = char:WaitForChild("HumanoidRootPart")
+    local root = char:FindFirstChild("HumanoidRootPart")
 
-    local target = getTarget("主要部件") -- 🔁 เปลี่ยนชื่อ object ได้
-    if not target then
-        warn("หา object ไม่เจอ!")
+    if not root then
+        warn("❌ ไม่เจอ HumanoidRootPart")
         return
     end
 
+    local target = getTarget("主要部件") -- 🔁 เปลี่ยนชื่อได้
+
+    if not target then
+        warn("❌ หา object ไม่เจอ!")
+        return
+    end
+
+    print("✅ เจอ object:", target:GetFullName())
+
     isTeleporting = true
 
-    -- 📌 จำตำแหน่งเดิม
     local originalCFrame = root.CFrame
 
-    -- 📌 offset ลง Y
-    local offset = Vector3.new(0, -100, 0)
+    -- 📌 offset ลง
+    local offset = Vector3.new(0, -20, 0)
     local targetCFrame = target.CFrame + offset
 
     -- ⚡ วาปไป
     root.CFrame = targetCFrame
 
-    -- ⏱ หน่วงสั้นมาก (ปรับได้)
     task.wait(0.1)
 
     -- ⚡ วาปกลับ
     root.CFrame = originalCFrame
 
     isTeleporting = false
-    print("Flash TP เสร็จ")
 end
 
 -- =========================
--- 🔹 เรียกใช้งาน
+-- 🔹 เรียกใช้
 -- =========================
 TPFlash()
