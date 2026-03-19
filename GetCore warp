@@ -68,7 +68,7 @@ local function TPFlash()
     root.CFrame = targetCFrame
 
     -- ⏱ หน่วง (ปรับได้)
-    task.wait(0.02)
+    task.wait(0.2)
 
     -- ⚡ วาปกลับ
     root.CFrame = originalCFrame
