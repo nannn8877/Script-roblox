@@ -41,12 +41,13 @@ end
 -- 🔹 วาปไป + กลับ
 -- =========================
 local function TPFlash()
+local function TPFlash()
     if isTeleporting then return end
 
     local char = Player.Character or Player.CharacterAdded:Wait()
     local root = char:WaitForChild("HumanoidRootPart")
 
-    local target = getTarget("主要部件") -- เปลี่ยนชื่อได้
+    local target = getTarget("主要部件")
     if not target then
         warn("หา object ไม่เจอ!")
         return
@@ -54,20 +55,21 @@ local function TPFlash()
 
     isTeleporting = true
 
-    -- 📌 เซฟตำแหน่งเดิม
     local originalCFrame = root.CFrame
 
-    -- ⚡ วาปไปหา object
-    root.CFrame = target.CFrame
+    -- 📌 ปรับตำแหน่ง (ลง -20)
+    local offset = Vector3.new(0, -20, 0)
+    local newCFrame = target.CFrame + offset
 
-    -- ⏱ รอสั้นมาก (ปรับได้)
+    -- ⚡ วาปไป
+    root.CFrame = newCFrame
+
     task.wait(0.1)
 
     -- ⚡ วาปกลับ
     root.CFrame = originalCFrame
 
     isTeleporting = false
-    print("Flash TP เสร็จ")
 end
 
 -- =========================
