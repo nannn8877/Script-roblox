@@ -1,0 +1,74 @@
+repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Player = Players.LocalPlayer
+
+-- 🔹 หา target (แก้ชื่อได้)
+local function getTarget()
+    local obj = workspace:WaitForChild("单位对象")
+        :WaitForChild("水晶")
+
+    if obj:IsA("Model") then
+        return obj
+    end
+
+    return obj
+end
+
+local target = getTarget()
+
+-- 🔹 สร้าง GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "FollowUI"
+
+local btn = Instance.new("TextButton", gui)
+btn.Size = UDim2.new(0,150,0,40)
+btn.Position = UDim2.new(0.5,-75,0.8,0)
+btn.Text = "Follow: OFF"
+btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+btn.TextColor3 = Color3.fromRGB(255,255,255)
+
+local corner = Instance.new("UICorner", btn)
+corner.CornerRadius = UDim.new(0,10)
+
+-- 🔹 สถานะ
+local following = false
+local loop
+
+-- 🔹 ฟังก์ชันให้ลอยบนหัว
+local function startFollow()
+    local char = Player.Character or Player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+
+    loop = RunService.RenderStepped:Connect(function()
+        if not target then return end
+
+        local offset = CFrame.new(0, 5, 0) -- 📌 สูงจากหัว
+        if target:IsA("Model") then
+            target:PivotTo(root.CFrame * offset)
+        else
+            target.CFrame = root.CFrame * offset
+        end
+    end)
+end
+
+local function stopFollow()
+    if loop then
+        loop:Disconnect()
+        loop = nil
+    end
+end
+
+-- 🔹 ปุ่มเปิด/ปิด
+btn.MouseButton1Click:Connect(function()
+    following = not following
+
+    if following then
+        btn.Text = "Follow: ON"
+        startFollow()
+    else
+        btn.Text = "Follow: OFF"
+        stopFollow()
+    end
+end)
