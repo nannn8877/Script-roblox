@@ -1,33 +1,34 @@
+-- รอเกมโหลดและ Player พร้อม
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Player = Players.LocalPlayer
 
--- 🔹 หา target (แก้ชื่อได้)
+-- 🔹 หา target (แก้ชื่อ object ของคุณ)
 local function getTarget()
-    local obj = workspace:FindFirstChild("主要部件", true)
-
+    local obj = workspace:WaitForChild("单位对象"):WaitForChild("水晶")
     if obj:IsA("Model") then
         return obj
+    else
+        return obj
     end
-
-    return obj
 end
 
 local target = getTarget()
 
 -- 🔹 สร้าง GUI
-local gui = Instance.new("ScreenGui", game.CoreGui)
+local gui = Instance.new("ScreenGui")
 gui.Name = "FollowUI"
+gui.Parent = Player:WaitForChild("PlayerGui")  -- ✅ อยู่ใน PlayerGui
 
 local btn = Instance.new("TextButton", gui)
-btn.Size = UDim2.new(0,150,0,40)
-btn.Position = UDim2.new(0.5,-75,0.8,0)
+btn.Size = UDim2.new(0,200,0,50)
+btn.Position = UDim2.new(0.5,-100,0.9,0) -- ตรงกลางล่าง
+btn.ZIndex = 10
 btn.Text = "Follow: OFF"
 btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
 btn.TextColor3 = Color3.fromRGB(255,255,255)
-
 local corner = Instance.new("UICorner", btn)
 corner.CornerRadius = UDim.new(0,10)
 
@@ -35,7 +36,7 @@ corner.CornerRadius = UDim.new(0,10)
 local following = false
 local loop
 
--- 🔹 ฟังก์ชันให้ลอยบนหัว
+-- 🔹 ฟังก์ชันเริ่มลอยตาม
 local function startFollow()
     local char = Player.Character or Player.CharacterAdded:Wait()
     local root = char:WaitForChild("HumanoidRootPart")
@@ -43,7 +44,7 @@ local function startFollow()
     loop = RunService.RenderStepped:Connect(function()
         if not target then return end
 
-        local offset = CFrame.new(0, 5, 0) -- 📌 สูงจากหัว
+        local offset = CFrame.new(0, 5, 0) -- สูงจากหัว 5 studs
         if target:IsA("Model") then
             target:PivotTo(root.CFrame * offset)
         else
@@ -52,6 +53,7 @@ local function startFollow()
     end)
 end
 
+-- 🔹 ฟังก์ชันหยุดลอย
 local function stopFollow()
     if loop then
         loop:Disconnect()
@@ -62,7 +64,6 @@ end
 -- 🔹 ปุ่มเปิด/ปิด
 btn.MouseButton1Click:Connect(function()
     following = not following
-
     if following then
         btn.Text = "Follow: ON"
         startFollow()
@@ -71,3 +72,12 @@ btn.MouseButton1Click:Connect(function()
         stopFollow()
     end
 end)
+
+-- 🔹 รองรับ respawn ตัวละคร
+Player.CharacterAdded:Connect(function(char)
+    if following then
+        startFollow()
+    end
+end)
+
+print("FollowUI Loaded Successfully!")
