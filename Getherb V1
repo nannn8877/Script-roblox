@@ -1,6 +1,7 @@
 -- 1. Player reference
 local player = game.Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- 2. สร้าง ScreenGui
 local screenGui = Instance.new("ScreenGui")
@@ -10,36 +11,80 @@ screenGui.Parent = playerGui
 -- 3. สร้างปุ่ม
 local button = Instance.new("TextButton")
 button.Size = UDim2.new(0, 200, 0, 50)
-button.Position = UDim2.new(1, -210, 0.5, -25) -- ชิดขวากลาง
-button.AnchorPoint = Vector2.new(1, 0.5) -- ให้ตำแหน่งอ้างอิงที่ขวากลาง
+button.Position = UDim2.new(1, -210, 0.5, -25)
+button.AnchorPoint = Vector2.new(1, 0.5)
 button.Text = "Collect Herb and Mailbox"
 button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
 button.TextColor3 = Color3.fromRGB(255, 255, 255)
 button.Parent = screenGui
 
--- 4. RemoteEvent ของ Herb
-local herbRemote = game:GetService("ReplicatedStorage")
+-- =========================
+-- 🔹 Remote เดิม
+-- =========================
+
+-- Herb
+local herbRemote = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
     :WaitForChild("\229\133\172\231\148\168")
     :WaitForChild("\229\134\156\231\148\176")
     :WaitForChild("\233\135\135\233\155\134")
 
--- 5. RemoteEvent ของ Mailbox
-local mailboxRemote = game:GetService("ReplicatedStorage")
+-- Mailbox
+local mailboxRemote = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
     :WaitForChild("\229\133\172\231\148\168")
     :WaitForChild("\233\130\174\228\187\182")
     :WaitForChild("\233\162\134\229\143\150\229\133\168\233\131\168\233\130\174\228\187\182")
 
--- 6. Event เมื่อคลิกปุ่ม
+-- =========================
+-- 🔹 Remote ใหม่ (เพิ่ม)
+-- =========================
+
+-- ตัวที่ 1
+local remote1 = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\149\134\229\186\151")
+    :WaitForChild("\233\147\182\232\161\140")
+    :WaitForChild("\233\162\134\229\143\150\231\144\134\232\180\162")
+
+-- ตัวที่ 2
+local remote2 = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\149\134\229\186\151")
+    :WaitForChild("\233\147\182\232\161\140")
+    :WaitForChild("\232\180\173\228\185\176\231\144\134\232\180\162")
+
+-- =========================
+-- 🔹 Event เมื่อกดปุ่ม
+-- =========================
 button.MouseButton1Click:Connect(function()
-    -- ส่ง RemoteEvent Herb
+
+    -- 🔥 1. Herb
     local numbers = {1,2,3,4,5}
     local vec = Vector2.new(654.7196655273438, 178.2879180908203)
+
     for _, num in ipairs(numbers) do
         herbRemote:FireServer(num, vec)
+        task.wait(0.05)
     end
 
-    -- ส่ง RemoteEvent Mailbox
+    -- 🔥 2. Mailbox
     mailboxRemote:FireServer()
+    task.wait(0.1)
+
+    -- 🔥 3. Remote ใหม่ (ตัวแรก 1-3)
+    for i = 1, 3 do
+        remote1:FireServer(i)
+        task.wait(0.05)
+    end
+
+    -- 🔥 4. Remote ใหม่ (ตัวที่สอง 1-3)
+    for i = 1, 3 do
+        remote2:FireServer(i)
+        task.wait(0.05)
+    end
+
+    print("✅ Collect ครบทุกระบบแล้ว")
 end)
