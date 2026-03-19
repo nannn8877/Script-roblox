@@ -5,7 +5,27 @@ local Player = Players.LocalPlayer
 
 local isTeleporting = false
 
--- 🔹 หา target
+-- =========================
+-- 🔹 ซ่อนชื่อ + หลอดเลือด
+-- =========================
+local function hideName(char)
+    local hum = char:WaitForChild("Humanoid")
+
+    hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+    hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+end
+
+Player.CharacterAdded:Connect(function(char)
+    hideName(char)
+end)
+
+if Player.Character then
+    hideName(Player.Character)
+end
+
+-- =========================
+-- 🔹 หา target (รองรับลึก + Model)
+-- =========================
 local function getTarget(name)
     local obj = workspace:FindFirstChild(name, true)
     if not obj then return nil end
@@ -17,14 +37,16 @@ local function getTarget(name)
     return obj
 end
 
--- 🔹 วาปไป + กลับ (ปรับ Y)
+-- =========================
+-- 🔹 วาปไป + กลับ (Y -20)
+-- =========================
 local function TPFlash()
     if isTeleporting then return end
 
     local char = Player.Character or Player.CharacterAdded:Wait()
     local root = char:WaitForChild("HumanoidRootPart")
 
-    local target = getTarget("主要部件")
+    local target = getTarget("主要部件") -- 🔁 เปลี่ยนชื่อ object ได้
     if not target then
         warn("หา object ไม่เจอ!")
         return
@@ -32,22 +54,27 @@ local function TPFlash()
 
     isTeleporting = true
 
+    -- 📌 จำตำแหน่งเดิม
     local originalCFrame = root.CFrame
 
-    -- 📌 ปรับตำแหน่ง (ลง -20)
+    -- 📌 offset ลง Y
     local offset = Vector3.new(0, -20, 0)
-    local newCFrame = target.CFrame + offset
+    local targetCFrame = target.CFrame + offset
 
     -- ⚡ วาปไป
-    root.CFrame = newCFrame
+    root.CFrame = targetCFrame
 
+    -- ⏱ หน่วงสั้นมาก (ปรับได้)
     task.wait(0.1)
 
     -- ⚡ วาปกลับ
     root.CFrame = originalCFrame
 
     isTeleporting = false
+    print("Flash TP เสร็จ")
 end
 
--- 🔹 เรียกใช้
+-- =========================
+-- 🔹 เรียกใช้งาน
+-- =========================
 TPFlash()
