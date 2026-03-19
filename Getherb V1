@@ -13,14 +13,10 @@ local button = Instance.new("TextButton")
 button.Size = UDim2.new(0, 200, 0, 50)
 button.Position = UDim2.new(1, -210, 0.5, -25)
 button.AnchorPoint = Vector2.new(1, 0.5)
-button.Text = "Collect Herb and Mailbox"
+button.Text = "Collect All"
 button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
 button.TextColor3 = Color3.fromRGB(255, 255, 255)
 button.Parent = screenGui
-
--- =========================
--- 🔹 Remote เดิม
--- =========================
 
 local herbRemote = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
@@ -33,10 +29,6 @@ local mailboxRemote = ReplicatedStorage
     :WaitForChild("\229\133\172\231\148\168")
     :WaitForChild("\233\130\174\228\187\182")
     :WaitForChild("\233\162\134\229\143\150\229\133\168\233\131\168\233\130\174\228\187\182")
-
--- =========================
--- 🔹 Remote ใหม่ (1-3)
--- =========================
 
 local remote1 = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
@@ -52,19 +44,11 @@ local remote2 = ReplicatedStorage
     :WaitForChild("\233\147\182\232\161\140")
     :WaitForChild("\232\180\173\228\185\176\231\144\134\232\180\162")
 
--- =========================
--- 🔹 Remote ใหม่ (ยิง 5 ครั้ง)
--- =========================
-
 local remote3 = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
     :WaitForChild("\229\133\172\231\148\168")
     :WaitForChild("\229\133\172\228\188\154")
     :WaitForChild("\230\141\144\231\140\174")
-
--- =========================
--- 🔹 Remote A ใหม่ (args 1-5, แต่ละตัว 3 ครั้ง + Vector2)
--- =========================
 
 local remoteA = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
@@ -72,15 +56,31 @@ local remoteA = ReplicatedStorage
     :WaitForChild("\230\175\143\230\151\165\228\187\187\229\138\161")
     :WaitForChild("\233\162\134\229\143\150\229\165\150\229\138\177")
 
--- =========================
--- 🔹 Remote B ใหม่ (ยิง 3 ครั้ง ไม่มี args)
--- =========================
-
 local remoteB = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
     :WaitForChild("\229\133\172\231\148\168")
     :WaitForChild("\232\189\172\231\155\152")
     :WaitForChild("\230\138\189\229\165\150")
+
+-- =========================
+-- 🔹 Remote C (1-6 อย่างละครั้ง)
+-- =========================
+
+local remoteC = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\232\138\130\230\151\165\230\180\187\229\138\168")
+    :WaitForChild("\233\162\134\229\143\150\229\165\150\229\138\177")
+
+-- =========================
+-- 🔹 Remote D (1-15 อย่างละครั้ง)
+-- =========================
+
+local remoteD = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\230\156\136\233\128\154\232\161\140\232\175\129")
+    :WaitForChild("\229\174\140\230\136\144\228\187\187\229\138\161")
 
 -- =========================
 -- 🔹 Event เมื่อกดปุ่ม
@@ -90,7 +90,6 @@ button.MouseButton1Click:Connect(function()
     -- 🔥 1. Herb
     local numbers = {1,2,3,4,5}
     local vec = Vector2.new(654.7196655273438, 178.2879180908203)
-
     for _, num in ipairs(numbers) do
         herbRemote:FireServer(num, vec)
         task.wait(0.05)
@@ -112,13 +111,13 @@ button.MouseButton1Click:Connect(function()
         task.wait(0.05)
     end
 
-    -- 🔥 5. Remote3 (ยิง 5 ครั้ง)
+    -- 🔥 5. Remote3 (5 ครั้ง)
     for i = 1, 5 do
         remote3:FireServer()
         task.wait(0.05)
     end
 
-    -- 🔥 6. Remote A (1-5, แต่ละตัวยิง 3 ครั้ง + Vector2)
+    -- 🔥 6. Remote A (1-5 แต่ละตัว 3 ครั้ง)
     local vecA = Vector2.new(643.2603759765625, 306.132568359375)
     for num = 1, 5 do
         for rep = 1, 3 do
@@ -127,9 +126,21 @@ button.MouseButton1Click:Connect(function()
         end
     end
 
-    -- 🔥 7. Remote B (ยิง 3 ครั้ง)
+    -- 🔥 7. Remote B (3 ครั้ง)
     for i = 1, 3 do
         remoteB:FireServer()
+        task.wait(0.05)
+    end
+
+    -- 🔥 8. Remote C (1-6 อย่างละครั้ง)
+    for i = 1, 6 do
+        remoteC:FireServer(i)
+        task.wait(0.05)
+    end
+
+    -- 🔥 9. Remote D (1-15 อย่างละครั้ง)
+    for i = 1, 15 do
+        remoteD:FireServer(i)
         task.wait(0.05)
     end
 
