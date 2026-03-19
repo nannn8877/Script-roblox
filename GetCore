@@ -2,24 +2,45 @@ repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local Player = game.Players.LocalPlayer
+local Players = game:GetService("Players")
+
+local Player = Players.LocalPlayer
 
 local isTweening = false
 local noclipEnabled = false
 local noclipLoop
 
 -- =========================
--- 🔹 Noclip Toggle
+-- 🔹 ซ่อนชื่อ
 -- =========================
-local function setNoclip(state)
+local function hideName(char)
+    local hum = char:WaitForChild("Humanoid")
+
+    hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+    hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+end
+
+Player.CharacterAdded:Connect(function(char)
+    hideName(char)
+end)
+
+if Player.Character then
+    hideName(Player.Character)
+end
+
+-- =========================
+-- 🔹 Noclip
+-- =========================
+local function setNoclip(state, char)
     noclipEnabled = state
 
-    if noclipEnabled then
-        noclipLoop = RunService.Stepped:Connect(function()
-            local char = Player.Character
-            if not char then return end
+    if noclipLoop then
+        noclipLoop:Disconnect()
+        noclipLoop = nil
+    end
 
+    if state then
+        noclipLoop = RunService.Stepped:Connect(function()
             for _, v in pairs(char:GetDescendants()) do
                 if v:IsA("BasePart") then
                     v.CanCollide = false
@@ -27,29 +48,13 @@ local function setNoclip(state)
             end
         end)
     else
-        if noclipLoop then
-            noclipLoop:Disconnect()
-            noclipLoop = nil
-        end
-
-        local char = Player.Character
-        if char then
-            for _, v in pairs(char:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = true
-                end
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = true
             end
         end
     end
 end
-
--- กด N เปิด/ปิด noclip
-UIS.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == Enum.KeyCode.N then
-        setNoclip(not noclipEnabled)
-        print("Noclip:", noclipEnabled)
-    end
-end)
 
 -- =========================
 -- 🔹 หา target
@@ -74,14 +79,14 @@ local function TPToTarget()
     local char = Player.Character or Player.CharacterAdded:Wait()
     local root = char:WaitForChild("HumanoidRootPart")
 
-    local target = getTarget("主要部件")
+    local target = getTarget("主要部件") -- เปลี่ยนชื่อ object ได้
     if not target then
         warn("หา object ไม่เจอ!")
         return
     end
 
     isTweening = true
-    setNoclip(true) -- เปิด noclip อัตโนมัติ
+    setNoclip(true, char)
 
     -- Body movers
     local bV = Instance.new("BodyVelocity")
@@ -95,7 +100,7 @@ local function TPToTarget()
     bG.CFrame = root.CFrame
     bG.Parent = root
 
-    -- tween
+    -- Tween
     local tween = TweenService:Create(root, TweenInfo.new(1), {
         CFrame = target.CFrame
     })
@@ -103,13 +108,18 @@ local function TPToTarget()
     tween:Play()
 
     tween.Completed:Connect(function()
+        if noclipLoop then noclipLoop:Disconnect() end
         if bV then bV:Destroy() end
         if bG then bG:Destroy() end
 
-        setNoclip(false) -- ปิด noclip หลังเสร็จ
-        isTweening = false
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = true
+            end
+        end
 
-        print("TP สำเร็จ")
+        isTweening = false
+        print("TP สำเร็จ + ซ่อนชื่อแล้ว")
     end)
 end
 
