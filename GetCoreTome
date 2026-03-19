@@ -6,8 +6,7 @@ local Player = Players.LocalPlayer
 
 -- 🔹 หา target (แก้ชื่อได้)
 local function getTarget()
-    local obj = workspace:WaitForChild("单位对象")
-        :WaitForChild("水晶")
+    local obj = 主要部件
 
     if obj:IsA("Model") then
         return obj
