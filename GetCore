@@ -50,7 +50,7 @@ TpButton.MouseButton1Click:Connect(function()
     local char = Player.Character or Player.CharacterAdded:Wait()
     local root = char:WaitForChild("HumanoidRootPart")
 
-    local target = workspace:FindFirstChild("主要部件")
+    local target = workspace:FindFirstChild("Amakami20")
     if not target then
         warn("Object ไม่เจอ!")
         return
