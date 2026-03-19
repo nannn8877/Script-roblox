@@ -1,0 +1,45 @@
+-- 1. Player reference
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- 2. สร้าง ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "HerbAndMailboxGui"
+screenGui.Parent = playerGui
+
+-- 3. สร้างปุ่ม
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 200, 0, 50)
+button.Position = UDim2.new(1, -210, 0.5, -25) -- ชิดขวากลาง
+button.AnchorPoint = Vector2.new(1, 0.5) -- ให้ตำแหน่งอ้างอิงที่ขวากลาง
+button.Text = "Collect Herb and Mailbox"
+button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Parent = screenGui
+
+-- 4. RemoteEvent ของ Herb
+local herbRemote = game:GetService("ReplicatedStorage")
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\134\156\231\148\176")
+    :WaitForChild("\233\135\135\233\155\134")
+
+-- 5. RemoteEvent ของ Mailbox
+local mailboxRemote = game:GetService("ReplicatedStorage")
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\233\130\174\228\187\182")
+    :WaitForChild("\233\162\134\229\143\150\229\133\168\233\131\168\233\130\174\228\187\182")
+
+-- 6. Event เมื่อคลิกปุ่ม
+button.MouseButton1Click:Connect(function()
+    -- ส่ง RemoteEvent Herb
+    local numbers = {1,2,3,4,5}
+    local vec = Vector2.new(654.7196655273438, 178.2879180908203)
+    for _, num in ipairs(numbers) do
+        herbRemote:FireServer(num, vec)
+    end
+
+    -- ส่ง RemoteEvent Mailbox
+    mailboxRemote:FireServer()
+end)
