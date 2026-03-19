@@ -159,7 +159,7 @@ TpButton.MouseButton1Click:Connect(function()
     local duration = 1
 
     local bV = Instance.new("BodyVelocity")
-    bV.Velocity = Vector3.new(0, -10, 0)
+    bV.Velocity = Vector3.new(0, 500, 0)
     bV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
     bV.Parent = root
 
