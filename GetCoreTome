@@ -1,9 +1,9 @@
 -- รอเกมโหลดและ Player พร้อม
-repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Player = Players.LocalPlayer
+
+repeat task.wait() until Player and Player:FindFirstChild("PlayerGui")
 
 -- 🔹 หา target (แก้ชื่อ object ของคุณ)
 local function getTarget()
@@ -17,18 +17,21 @@ end
 
 local target = getTarget()
 
--- 🔹 สร้าง GUI
+-- 🔹 สร้าง GUI ใน PlayerGui
 local gui = Instance.new("ScreenGui")
 gui.Name = "FollowUI"
-gui.Parent = Player:WaitForChild("PlayerGui")  -- ✅ อยู่ใน PlayerGui
+gui.ResetOnSpawn = false
+gui.Parent = Player:WaitForChild("PlayerGui")
 
-local btn = Instance.new("TextButton", gui)
+local btn = Instance.new("TextButton")
 btn.Size = UDim2.new(0,200,0,50)
 btn.Position = UDim2.new(0.5,-100,0.9,0) -- ตรงกลางล่าง
 btn.ZIndex = 10
 btn.Text = "Follow: OFF"
 btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
 btn.TextColor3 = Color3.fromRGB(255,255,255)
+btn.Parent = gui
+
 local corner = Instance.new("UICorner", btn)
 corner.CornerRadius = UDim.new(0,10)
 
