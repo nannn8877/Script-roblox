@@ -2,57 +2,32 @@ repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
 local Player = game.Players.LocalPlayer
 
--- UI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = game.CoreGui
-ScreenGui.Name = "GetCore"
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0,250,0,180)
-MainFrame.Position = UDim2.new(0.5,-125,0.4,-75)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
-MainFrame.Active = true
-MainFrame.Draggable = true
-
-local TpButton = Instance.new("TextButton")
-TpButton.Parent = MainFrame
-TpButton.Size = UDim2.new(0.8,0,0,35)
-TpButton.Position = UDim2.new(0.1,0,0.3,0)
-TpButton.Text = "TP to Core"
-
--- Speed
-local defaultSpeed = 100
-
-local function ApplySpeed()
-    local char = Player.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.WalkSpeed = defaultSpeed
-    end
-end
-
--- Toggle UI
-UIS.InputBegan:Connect(function(input,gpe)
-    if not gpe and input.KeyCode == Enum.KeyCode.LeftControl then
-        MainFrame.Visible = not MainFrame.Visible
-    end
-end)
-
--- TP Logic
 local isTweening = false
 
-TpButton.MouseButton1Click:Connect(function()
+-- ฟังก์ชันหา target (รองรับ nested + Model)
+local function getTarget(name)
+    local obj = workspace:FindFirstChild(name, true) -- หาแบบลึกทั้งแมพ
+    if not obj then return nil end
+
+    if obj:IsA("Model") then
+        obj = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+    end
+
+    return obj
+end
+
+-- ปุ่มกด (เรียกใช้ได้เลย)
+local function TPToTarget()
     if isTweening then return end
-    
+
     local char = Player.Character or Player.CharacterAdded:Wait()
     local root = char:WaitForChild("HumanoidRootPart")
 
-    local target = workspace:FindFirstChild("Amakami20")
+    local target = getTarget("主要部件")
     if not target then
-        warn("Object ไม่เจอ!")
+        warn("หา object ไม่เจอ หรือไม่มี BasePart!")
         return
     end
 
@@ -80,10 +55,11 @@ TpButton.MouseButton1Click:Connect(function()
         end
     end)
 
-    -- tween
+    -- tween ไปหา object
     local tween = TweenService:Create(root, TweenInfo.new(1), {
         CFrame = target.CFrame
     })
+
     tween:Play()
 
     tween.Completed:Connect(function()
@@ -91,6 +67,7 @@ TpButton.MouseButton1Click:Connect(function()
         if bV then bV:Destroy() end
         if bG then bG:Destroy() end
 
+        -- เปิด collide กลับ
         for _, v in pairs(char:GetDescendants()) do
             if v:IsA("BasePart") then
                 v.CanCollide = true
@@ -98,19 +75,9 @@ TpButton.MouseButton1Click:Connect(function()
         end
 
         isTweening = false
-        TpButton.Text = "TP to Core"
-        ApplySpeed()
+        print("TP สำเร็จ")
     end)
-end)
-
--- Apply speed ตอนเกิดใหม่
-Player.CharacterAdded:Connect(function(char)
-    char:WaitForChild("Humanoid")
-    ApplySpeed()
-end)
-
-if Player.Character then
-    ApplySpeed()
 end
 
-print("Get Core Loaded!")
+-- เรียกใช้ (ลองกดรันได้เลย)
+TPToTarget()
