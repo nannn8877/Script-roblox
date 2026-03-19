@@ -36,7 +36,7 @@ local function TPToTarget()
     -- Body movers
     local bV = Instance.new("BodyVelocity")
     bV.MaxForce = Vector3.new(9e9,9e9,9e9)
-    bV.Velocity = Vector3.new(0,-20,0)
+    bV.Velocity = Vector3.new(0,-50,0)
     bV.Parent = root
 
     local bG = Instance.new("BodyGyro")
