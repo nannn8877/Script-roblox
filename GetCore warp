@@ -1,9 +1,10 @@
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 
 local Players = game:GetService("Players")
-local Player = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
 
-local isTeleporting = false
+local Player = Players.LocalPlayer
+local isMoving = false
 
 -- =========================
 -- 🔹 ซ่อนชื่อ
@@ -18,69 +19,62 @@ Player.CharacterAdded:Connect(hideName)
 if Player.Character then hideName(Player.Character) end
 
 -- =========================
--- 🔹 หา target (ลึก + รองรับ Model)
+-- 🔹 target (ใช้ path ตรง)
 -- =========================
-local function getTarget(name)
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj.Name == name then
-            if obj:IsA("BasePart") then
-                return obj
-            elseif obj:IsA("Model") then
-                return obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-            end
-        end
-    end
-    return nil
+local function getTarget()
+    return workspace:WaitForChild("单位对象")
+        :WaitForChild("水晶")
+        :WaitForChild("HumanoidRootPart")
 end
 
 -- =========================
--- 🔹 วาป
+-- 🔹 Tween ไปหา object
 -- =========================
-local function TPFlash()
-    if isTeleporting then return end
+local function TweenToTarget()
+    if isMoving then return end
 
     local char = Player.Character or Player.CharacterAdded:Wait()
-    local root = char:FindFirstChild("HumanoidRootPart")
+    local root = char:WaitForChild("HumanoidRootPart")
 
-    if not root then
-        warn("❌ ไม่เจอ HumanoidRootPart")
-        return
-    end
-
-    local target = workspace:WaitForChild("单位对象")
-    :WaitForChild("水晶")
-    :WaitForChild("HumanoidRootPart")
-
+    local target = getTarget()
     if not target then
         warn("❌ หา object ไม่เจอ!")
         return
     end
 
-    isTeleporting = true
+    isMoving = true
 
-    local originalCFrame = root.CFrame
+    -- 📌 ระยะห่าง
+    local distance = (root.Position - target.Position).Magnitude
 
-    -- 📌 ปรับ Y (ลงใต้)
-    local offset = Vector3.new(0, -15, 0)
-    local targetCFrame = target.CFrame + offset
+    -- 📌 ความเร็ว 200
+    local speed = 200
 
-    -- ⚡ วาปไป
-    root.CFrame = targetCFrame
+    -- 📌 คำนวณเวลา
+    local time = distance / speed
 
-    -- ⏱ หน่วง (ปรับได้)
-    task.wait(1)
+    -- 📌 Tween ไปหา (ขยับลงนิดนึง)
+    local goal = {}
+    goal.CFrame = target.CFrame * CFrame.new(0, -5, 0)
 
-    -- ⚡ วาปกลับ
-    root.CFrame = originalCFrame
+    local tween = TweenService:Create(
+        root,
+        TweenInfo.new(time, Enum.EasingStyle.Linear),
+        goal
+    )
 
-    isTeleporting = false
+    tween:Play()
+
+    tween.Completed:Connect(function()
+        isMoving = false
+    end)
 end
 
 -- =========================
 -- 🔹 GUI
 -- =========================
 local gui = Instance.new("ScreenGui")
-gui.Name = "TP_UI"
+gui.Name = "TweenUI"
 gui.ResetOnSpawn = false
 gui.Parent = Player:WaitForChild("PlayerGui")
 
@@ -88,7 +82,7 @@ local btn = Instance.new("TextButton")
 btn.Parent = gui
 btn.Size = UDim2.new(0, 200, 0, 50)
 btn.Position = UDim2.new(0.5, -100, 0.85, 0)
-btn.Text = "TP TO OBJECT"
+btn.Text = "Tween To Object"
 btn.BackgroundColor3 = Color3.fromRGB(30,30,30)
 btn.TextColor3 = Color3.fromRGB(255,255,255)
 btn.TextSize = 16
@@ -96,9 +90,9 @@ btn.TextSize = 16
 local corner = Instance.new("UICorner", btn)
 corner.CornerRadius = UDim.new(0, 10)
 
--- 🔹 กดปุ่ม = วาป
+-- 🔹 กดปุ่ม = Tween
 btn.MouseButton1Click:Connect(function()
-    TPFlash()
+    TweenToTarget()
 end)
 
-print("TP GUI Loaded ✅")
+print("Tween GUI Loaded ✅")
