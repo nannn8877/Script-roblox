@@ -154,39 +154,50 @@ TpButton.MouseButton1Click:Connect(function()
     TpButton.Text = "TELEPORTING..."
     TpButton.BackgroundColor3 = Color3.fromRGB(100, 50, 0)
 
-    local target = workspace:FindFirstChild("主要部件")
+    local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Player = game.Players.LocalPlayer
+local char = Player.Character
+
+local target = workspace:FindFirstChild("主要部件")
 if not target then
     warn("Object ไม่เจอ!")
     return
 end
 
-local root = game.Players.LocalPlayer.Character.HumanoidRootPart
-root.CFrame = target.CFrame -- เดินไปตำแหน่ง object
-    local bV = Instance.new("BodyVelocity")
-    bV.Velocity = Vector3.new(0, 0, 0)
-    bV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bV.Parent = root
+local root = char:WaitForChild("HumanoidRootPart")
 
-    local bG = Instance.new("BodyGyro")
-    bG.P = 9e4
-    bG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-    bG.CFrame = root.CFrame
-    bG.Parent = root
+-- สร้าง BodyVelocity / BodyGyro
+local bV = Instance.new("BodyVelocity")
+bV.Velocity = Vector3.new(0,0,0)
+bV.MaxForce = Vector3.new(9e9,9e9,9e9)
+bV.Parent = root
 
-    local noclipLoop = RunService.Stepped:Connect(function()
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
+local bG = Instance.new("BodyGyro")
+bG.P = 9e4
+bG.MaxTorque = Vector3.new(9e9,9e9,9e9)
+bG.CFrame = root.CFrame
+bG.Parent = root
+
+-- Noclip
+local noclipLoop = RunService.Stepped:Connect(function()
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
         end
-    end)
-    local TweenService = game:GetService("TweenService")
+    end
+end)
 
-    local tween = TweenService:Create(root, TweenInfo.new(1), {
-    CFrame = target.CFrame
-})
-
+-- Tween ไป target
+local tween = TweenService:Create(root, TweenInfo.new(1), {CFrame = target.CFrame})
 tween:Play()
+
+-- ลบ BodyVelocity / BodyGyro / Noclip หลัง Tween เสร็จ
+tween.Completed:Connect(function()
+    bV:Destroy()
+    bG:Destroy()
+    noclipLoop:Disconnect()
+end)
 
     tween.Completed:Connect(function()
         noclipLoop:Disconnect()
