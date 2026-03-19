@@ -61,14 +61,14 @@ local function TPFlash()
     local originalCFrame = root.CFrame
 
     -- 📌 ปรับ Y (ลงใต้)
-    local offset = Vector3.new(0, -10, 0)
+    local offset = Vector3.new(0, -15, 0)
     local targetCFrame = target.CFrame + offset
 
     -- ⚡ วาปไป
     root.CFrame = targetCFrame
 
     -- ⏱ หน่วง (ปรับได้)
-    task.wait(0.5)
+    task.wait(1)
 
     -- ⚡ วาปกลับ
     root.CFrame = originalCFrame
