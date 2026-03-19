@@ -154,8 +154,10 @@ TpButton.MouseButton1Click:Connect(function()
     TpButton.Text = "TELEPORTING..."
     TpButton.BackgroundColor3 = Color3.fromRGB(100, 50, 0)
 
-    local target = 主要部件
-    local root = game.Players.LocalPlayer.Character.HumanoidRootPart
+    -- สมมติ object อยู่ใน Workspace
+    local target = workspace:FindFirstChild("主要部件")
+    locallocal root = game.Players.LocalPlayer.Character.HumanoidRootPart
+    CFrame = target.CFrame
 
     local bV = Instance.new("BodyVelocity")
     bV.Velocity = Vector3.new(0, 0, 0)
