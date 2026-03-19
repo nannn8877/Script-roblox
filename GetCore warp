@@ -58,7 +58,7 @@ local function TPFlash()
     local originalCFrame = root.CFrame
 
     -- 📌 offset ลง Y
-    local offset = Vector3.new(0, -20, 0)
+    local offset = Vector3.new(0, -100, 0)
     local targetCFrame = target.CFrame + offset
 
     -- ⚡ วาปไป
