@@ -1,9 +1,7 @@
--- Player reference
 local player = game.Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- สร้าง ScreenGui + ปุ่ม
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "HerbAndMailboxGui"
 screenGui.Parent = playerGui
@@ -83,46 +81,117 @@ local buyRemote = ReplicatedStorage
     :WaitForChild("\229\133\172\228\188\154")
     :WaitForChild("\229\133\145\230\141\162")
 
--- bytes ของ 名称
-local NAME_LABEL = "\229\144\141\231\167\176"
+local refreshRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\133\172\228\188\154")
+    :WaitForChild("\229\136\183\230\150\176\229\133\172\228\188\154\229\149\134\229\186\151")
 
 -- =========================
--- ฟังก์ชันซื้อสมุนไพรทุกช่องที่เจอ
--- ใช้ลำดับจาก GetChildren() ตรงๆ (LayoutOrder = 0 ทุกช่อง)
--- เช็คเฉพาะ 名称.Text == "Herb" เท่านั้น
+-- Bytes จริงจาก debug:
+-- 二级界面 = \228\186\140\231\186\167\231\149\140\233\157\162
+-- 公会     = \229\133\172\228\188\154
+-- 背景     = \232\131\140\230\153\175
+-- 右侧界面 = \229\143\179\228\190\167\231\149\140\233\157\162
+-- 商店     = \229\149\134\229\186\151
+-- 公会币   = \229\133\172\228\188\154\229\184\129
 -- =========================
 
+local function getGuildCoins()
+    local gui = playerGui:FindFirstChild("GUI")
+    if not gui then print("❌ ไม่พบ GUI") return nil end
+
+    local n1 = gui:FindFirstChild("\228\186\140\231\186\167\231\149\140\233\157\162")  -- 二级界面
+    if not n1 then print("❌ ไม่พบ 二级界面") return nil end
+
+    local n2 = n1:FindFirstChild("\229\133\172\228\188\154")                            -- 公会
+    if not n2 then print("❌ ไม่พบ 公会") return nil end
+
+    local n3 = n2:FindFirstChild("\232\131\140\230\153\175")                            -- 背景
+    if not n3 then print("❌ ไม่พบ 背景") return nil end
+
+    local n4 = n3:FindFirstChild("\229\143\179\228\190\167\231\149\140\233\157\162")   -- 右侧界面
+    if not n4 then print("❌ ไม่พบ 右侧界面") return nil end
+
+    local n5 = n4:FindFirstChild("\229\149\134\229\186\151")                            -- 商店
+    if not n5 then print("❌ ไม่พบ 商店") return nil end
+
+    local n6 = n5:FindFirstChild("\229\133\172\228\188\154\229\184\129")                -- 公会币
+    if not n6 then print("❌ ไม่พบ 公会币") return nil end
+
+    -- หา TextLabel ใดๆ ใน 公会币 ที่เป็นตัวเลข
+    for _, child in pairs(n6:GetDescendants()) do
+        if child:IsA("TextLabel") or child:IsA("TextButton") then
+            local txt = tostring(child.Text or "")
+            txt = txt:gsub(",", "")
+            txt = txt:gsub(" ", "")
+            local num = tonumber(txt)
+            if num then
+                print("💰 เหรียญกิล: " .. num)
+                return num
+            end
+        end
+    end
+
+    print("❌ หาตัวเลขเหรียญไม่เจอ")
+    return nil
+end
+
+-- =========================
+-- ซื้อสมุนไพรทุกช่องที่มีเหรียญพอ
+-- =========================
 local function autoBuyHerb()
     for _, obj in pairs(playerGui:GetDescendants()) do
         if obj.Name == "\229\136\151\232\161\168"              -- 列表
             and obj.Parent
             and obj.Parent.Name == "\229\149\134\229\186\151"  -- 商店
         then
-            local found = false
             local index = 0
+            local found = false
 
             for _, child in ipairs(obj:GetChildren()) do
                 if child:IsA("Frame") then
                     index = index + 1
-
-                    -- หา 名称 label ใน Frame นี้
-                    local nameLabel = child:FindFirstChild(NAME_LABEL, true)  -- recursive
+                    local nameLabel = child:FindFirstChild("\229\144\141\231\167\176", true)
                     if nameLabel and nameLabel.Text == "Herb" then
-                        print("✅ ช่อง " .. index .. " = Herb → ซื้อ")
-                        buyRemote:FireServer(index)
-                        task.wait(0.15)
-                        found = true
+                        local coins = getGuildCoins()
+                        if coins and coins >= 400 then
+                            print("✅ ช่อง " .. index .. " = Herb | เหรียญ " .. coins .. " → ซื้อ")
+                            buyRemote:FireServer(index)
+                            task.wait(0.2)
+                            found = true
+                        else
+                            print("⛔ ช่อง " .. index .. " = Herb แต่เหรียญไม่พอ (" .. tostring(coins) .. ")")
+                        end
                     end
                 end
             end
 
             if not found then
-                print("ℹ️ ไม่พบสมุนไพรในร้านวันนี้")
+                print("ℹ️ ไม่พบสมุนไพร หรือเหรียญไม่พอ")
             end
             return
         end
     end
     print("❌ หา 列表 ไม่เจอ")
+end
+
+-- =========================
+-- ซื้อ + รีเฟรช 1 ครั้งถ้าเหรียญยังพอ
+-- =========================
+local function buyHerbWithRefresh()
+    autoBuyHerb()
+    task.wait(0.3)
+
+    local coinsLeft = getGuildCoins()
+    if coinsLeft and coinsLeft >= 400 then
+        print("🔄 เหรียญยังพอ (" .. coinsLeft .. ") → รีเฟรชร้าน")
+        refreshRemote:FireServer()
+        task.wait(1.5)
+        autoBuyHerb()
+    else
+        print("ℹ️ เหรียญไม่พอรีเฟรช (" .. tostring(coinsLeft) .. ") จบการซื้อ")
+    end
 end
 
 -- =========================
@@ -190,8 +259,8 @@ button.MouseButton1Click:Connect(function()
             task.wait(0.05)
         end
 
-        -- 10. ซื้อสมุนไพรทุกช่องที่เจอ
-        autoBuyHerb()
+        -- 10. ซื้อสมุนไพร + รีเฟรช 1 ครั้งถ้าเหรียญพอ
+        buyHerbWithRefresh()
 
     end)
 
