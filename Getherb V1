@@ -1,14 +1,13 @@
--- 1. Player reference
+-- Player reference
 local player = game.Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- 2. สร้าง ScreenGui
+-- สร้าง ScreenGui + ปุ่ม
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "HerbAndMailboxGui"
 screenGui.Parent = playerGui
 
--- 3. สร้างปุ่ม
 local button = Instance.new("TextButton")
 button.Size = UDim2.new(0, 200, 0, 50)
 button.Position = UDim2.new(1, -210, 0.5, -25)
@@ -17,6 +16,10 @@ button.Text = "Collect All"
 button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
 button.TextColor3 = Color3.fromRGB(255, 255, 255)
 button.Parent = screenGui
+
+-- =========================
+-- Remote ทั้งหมด
+-- =========================
 
 local herbRemote = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
@@ -62,19 +65,11 @@ local remoteB = ReplicatedStorage
     :WaitForChild("\232\189\172\231\155\152")
     :WaitForChild("\230\138\189\229\165\150")
 
--- =========================
--- 🔹 Remote C (1-6 อย่างละครั้ง)
--- =========================
-
 local remoteC = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
     :WaitForChild("\229\133\172\231\148\168")
     :WaitForChild("\232\138\130\230\151\165\230\180\187\229\138\168")
     :WaitForChild("\233\162\134\229\143\150\229\165\150\229\138\177")
-
--- =========================
--- 🔹 Remote D (1-15 อย่างละครั้ง)
--- =========================
 
 local remoteD = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
@@ -82,68 +77,129 @@ local remoteD = ReplicatedStorage
     :WaitForChild("\230\156\136\233\128\154\232\161\140\232\175\129")
     :WaitForChild("\229\174\140\230\136\144\228\187\187\229\138\161")
 
+local buyRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\133\172\228\188\154")
+    :WaitForChild("\229\133\145\230\141\162")
+
+-- bytes ของ 名称
+local NAME_LABEL = "\229\144\141\231\167\176"
+
 -- =========================
--- 🔹 Event เมื่อกดปุ่ม
+-- ฟังก์ชันซื้อสมุนไพรทุกช่องที่เจอ
+-- ใช้ลำดับจาก GetChildren() ตรงๆ (LayoutOrder = 0 ทุกช่อง)
+-- เช็คเฉพาะ 名称.Text == "Herb" เท่านั้น
 -- =========================
-button.MouseButton1Click:Connect(function()
 
-    -- 🔥 1. Herb
-    local numbers = {1,2,3,4,5}
-    local vec = Vector2.new(654.7196655273438, 178.2879180908203)
-    for _, num in ipairs(numbers) do
-        herbRemote:FireServer(num, vec)
-        task.wait(0.05)
-    end
+local function autoBuyHerb()
+    for _, obj in pairs(playerGui:GetDescendants()) do
+        if obj.Name == "\229\136\151\232\161\168"              -- 列表
+            and obj.Parent
+            and obj.Parent.Name == "\229\149\134\229\186\151"  -- 商店
+        then
+            local found = false
+            local index = 0
 
-    -- 🔥 2. Mailbox
-    mailboxRemote:FireServer()
-    task.wait(0.1)
+            for _, child in ipairs(obj:GetChildren()) do
+                if child:IsA("Frame") then
+                    index = index + 1
 
-    -- 🔥 3. Remote1 (1-3)
-    for i = 1, 3 do
-        remote1:FireServer(i)
-        task.wait(0.05)
-    end
+                    -- หา 名称 label ใน Frame นี้
+                    local nameLabel = child:FindFirstChild(NAME_LABEL, true)  -- recursive
+                    if nameLabel and nameLabel.Text == "Herb" then
+                        print("✅ ช่อง " .. index .. " = Herb → ซื้อ")
+                        buyRemote:FireServer(index)
+                        task.wait(0.15)
+                        found = true
+                    end
+                end
+            end
 
-    -- 🔥 4. Remote2 (1-3)
-    for i = 1, 3 do
-        remote2:FireServer(i)
-        task.wait(0.05)
-    end
-
-    -- 🔥 5. Remote3 (5 ครั้ง)
-    for i = 1, 5 do
-        remote3:FireServer()
-        task.wait(0.05)
-    end
-
-    -- 🔥 6. Remote A (1-5 แต่ละตัว 3 ครั้ง)
-    local vecA = Vector2.new(643.2603759765625, 306.132568359375)
-    for num = 1, 5 do
-        for rep = 1, 3 do
-            remoteA:FireServer(num, vecA)
-            task.wait(0.05)
+            if not found then
+                print("ℹ️ ไม่พบสมุนไพรในร้านวันนี้")
+            end
+            return
         end
     end
+    print("❌ หา 列表 ไม่เจอ")
+end
 
-    -- 🔥 7. Remote B (3 ครั้ง)
-    for i = 1, 3 do
-        remoteB:FireServer()
-        task.wait(0.05)
+-- =========================
+-- Event เมื่อกดปุ่ม
+-- =========================
+button.MouseButton1Click:Connect(function()
+    button.Text = "Running..."
+    button.BackgroundColor3 = Color3.fromRGB(170, 100, 0)
+
+    local ok, err = pcall(function()
+
+        -- 1. Herb
+        local vec = Vector2.new(654.7196655273438, 178.2879180908203)
+        for _, num in ipairs({1,2,3,4,5}) do
+            herbRemote:FireServer(num, vec)
+            task.wait(0.05)
+        end
+
+        -- 2. Mailbox
+        mailboxRemote:FireServer()
+        task.wait(0.1)
+
+        -- 3. Remote1 (1-3)
+        for i = 1, 3 do
+            remote1:FireServer(i)
+            task.wait(0.05)
+        end
+
+        -- 4. Remote2 (1-3)
+        for i = 1, 3 do
+            remote2:FireServer(i)
+            task.wait(0.05)
+        end
+
+        -- 5. Remote3 (5 ครั้ง)
+        for i = 1, 5 do
+            remote3:FireServer()
+            task.wait(0.05)
+        end
+
+        -- 6. Remote A (1-5 แต่ละตัว 3 ครั้ง)
+        local vecA = Vector2.new(643.2603759765625, 306.132568359375)
+        for num = 1, 5 do
+            for _ = 1, 3 do
+                remoteA:FireServer(num, vecA)
+                task.wait(0.05)
+            end
+        end
+
+        -- 7. Remote B (3 ครั้ง)
+        for i = 1, 3 do
+            remoteB:FireServer()
+            task.wait(0.05)
+        end
+
+        -- 8. Remote C (1-6)
+        for i = 1, 6 do
+            remoteC:FireServer(i)
+            task.wait(0.05)
+        end
+
+        -- 9. Remote D (1-15)
+        for i = 1, 15 do
+            remoteD:FireServer(i)
+            task.wait(0.05)
+        end
+
+        -- 10. ซื้อสมุนไพรทุกช่องที่เจอ
+        autoBuyHerb()
+
+    end)
+
+    if not ok then
+        print("❌ Error: " .. tostring(err))
     end
 
-    -- 🔥 8. Remote C (1-6 อย่างละครั้ง)
-    for i = 1, 6 do
-        remoteC:FireServer(i)
-        task.wait(0.05)
-    end
-
-    -- 🔥 9. Remote D (1-15 อย่างละครั้ง)
-    for i = 1, 15 do
-        remoteD:FireServer(i)
-        task.wait(0.05)
-    end
-
+    button.Text = "Collect All"
+    button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
     print("✅ All Complete")
-
 end)
