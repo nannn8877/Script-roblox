@@ -1,86 +1,41 @@
--- รอเกมโหลดและ Player พร้อม
+local _ENV = (getgenv or getrenv or getfenv)()
+local Module = {}
+
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
-repeat task.wait() until Player and Player:FindFirstChild("PlayerGui")
+-- 🔹 จุดลอยฟ้า
+local SAFE_ENVIRONMENT = _ENV.SAFE_ENVIRONMENT or Instance.new("Part")
+SAFE_ENVIRONMENT.Parent = workspace
+SAFE_ENVIRONMENT.Transparency = 0.5
+SAFE_ENVIRONMENT.Size = Vector3.new(1000, 3, 1000)
+SAFE_ENVIRONMENT.CFrame = CFrame.new(0, 50000, 0)
+SAFE_ENVIRONMENT.Anchored = true
 
--- 🔹 หา target (แก้ชื่อ object ของคุณ)
-local function getTarget()
-    local obj = workspace:WaitForChild("单位对象"):WaitForChild("水晶")
-    if obj:IsA("Model") then
-        return obj
-    else
-        return obj
-    end
+-- 🔹 วาป
+function Module:Teleport(cf)
+    HumanoidRootPart.CFrame = cf
 end
 
-local target = getTarget()
-
--- 🔹 สร้าง GUI ใน PlayerGui
-local gui = Instance.new("ScreenGui")
-gui.Name = "FollowUI"
-gui.ResetOnSpawn = false
-gui.Parent = Player:WaitForChild("PlayerGui")
-
-local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0,200,0,50)
-btn.Position = UDim2.new(0.5,-100,0.9,0) -- ตรงกลางล่าง
-btn.ZIndex = 10
-btn.Text = "Follow: OFF"
-btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-btn.TextColor3 = Color3.fromRGB(255,255,255)
-btn.Parent = gui
-
-local corner = Instance.new("UICorner", btn)
-corner.CornerRadius = UDim.new(0,10)
-
--- 🔹 สถานะ
-local following = false
-local loop
-
--- 🔹 ฟังก์ชันเริ่มลอยตาม
-local function startFollow()
-    local char = Player.Character or Player.CharacterAdded:Wait()
-    local root = char:WaitForChild("HumanoidRootPart")
-
-    loop = RunService.RenderStepped:Connect(function()
-        if not target then return end
-
-        local offset = CFrame.new(0, 5, 0) -- สูงจากหัว 5 studs
-        if target:IsA("Model") then
-            target:PivotTo(root.CFrame * offset)
-        else
-            target.CFrame = root.CFrame * offset
-        end
-    end)
+-- 🔹 ดึง
+function Module:Pull(part)
+    if not part then return end
+    
+    local front = HumanoidRootPart.CFrame * CFrame.new(0, 0, -10)
+    part.CFrame = front
 end
 
--- 🔹 ฟังก์ชันหยุดลอย
-local function stopFollow()
-    if loop then
-        loop:Disconnect()
-        loop = nil
-    end
-end
+-- 🔹 วาปขึ้นฟ้า
+Module:Teleport(SAFE_ENVIRONMENT.CFrame + Vector3.new(0,10,0))
 
--- 🔹 ปุ่มเปิด/ปิด
-btn.MouseButton1Click:Connect(function()
-    following = not following
-    if following then
-        btn.Text = "Follow: ON"
-        startFollow()
-    else
-        btn.Text = "Follow: OFF"
-        stopFollow()
-    end
+-- 🔥 target ตาม path ที่ให้มา
+local target = workspace:WaitForChild("单位对象")
+    :WaitForChild("水晶")
+    :WaitForChild("HumanoidRootPart")
+
+-- 🔥 ดึง
+task.delay(1, function()
+    Module:Pull(target)
 end)
-
--- 🔹 รองรับ respawn ตัวละคร
-Player.CharacterAdded:Connect(function(char)
-    if following then
-        startFollow()
-    end
-end)
-
-print("FollowUI Loaded Successfully!")
