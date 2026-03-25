@@ -57,11 +57,18 @@ local remoteA = ReplicatedStorage
     :WaitForChild("\230\175\143\230\151\165\228\187\187\229\138\161")
     :WaitForChild("\233\162\134\229\143\150\229\165\150\229\138\177")
 
-local remoteB = ReplicatedStorage
+-- 🎰 วงล้อ
+local spinRemote = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
     :WaitForChild("\229\133\172\231\148\168")
     :WaitForChild("\232\189\172\231\155\152")
-    :WaitForChild("\230\138\189\229\165\150")
+    :WaitForChild("\230\138\189\229\165\150") -- สุ่ม
+
+local skipRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\232\189\172\231\155\152")
+    :WaitForChild("\233\162\134\229\165\150") -- skip
 
 local remoteC = ReplicatedStorage
     :WaitForChild("\228\186\139\228\187\182")
@@ -194,6 +201,23 @@ local function buyHerbWithRefresh()
     end
 end
 
+-- 🎰 ฟังก์ชันสุ่มวงล้อ + skip
+local function spinWheel()
+    local vec = Vector2.new(494.66546630859375, 69.48560333251953)
+
+    for i = 1, 3 do
+        print("🎰 รอบที่ " .. i)
+
+        -- สุ่มวงล้อ
+        spinRemote:FireServer()
+        task.wait(0.8) -- รอ animation / server
+
+        -- skip
+        skipRemote:FireServer(vec, 5)
+        task.wait(0.3)
+    end
+end
+
 -- =========================
 -- Event เมื่อกดปุ่ม
 -- =========================
@@ -241,11 +265,8 @@ button.MouseButton1Click:Connect(function()
             end
         end
 
-        -- 7. Remote B (3 ครั้ง)
-        for i = 1, 3 do
-            remoteB:FireServer()
-            task.wait(0.05)
-        end
+        -- 7. 🎰 วงล้อ + skip (แทน Remote B เดิม)
+        spinWheel()
 
         -- 8. Remote C (1-6)
         for i = 1, 6 do
