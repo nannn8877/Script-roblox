@@ -94,6 +94,11 @@ local refreshRemote = ReplicatedStorage
     :WaitForChild("\229\133\172\228\188\154")
     :WaitForChild("\229\136\183\230\150\176\229\133\172\228\188\154\229\149\134\229\186\151")
 
+local remoteArce = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\185\184\232\191\144\232\189\172\231\155\152")
+    :WaitForChild("\232\189\172\231\155\152")
 -- =========================
 -- Bytes จริงจาก debug:
 -- 二级界面 = \228\186\140\231\186\167\231\149\140\233\157\162
@@ -232,6 +237,12 @@ button.MouseButton1Click:Connect(function()
         for _, num in ipairs({1,2,3,4,5}) do
             herbRemote:FireServer(num, vec)
             task.wait(0.05)
+        end
+        -- 1.5 Lucky Spin
+
+        for i = 1, 30 do
+            remoteArce:FireServer()
+            task.wait(0.03)
         end
 
         -- 2. Mailbox
