@@ -1,0 +1,38 @@
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+--// Remote
+local remote = ReplicatedStorage
+    :WaitForChild("单位对象")
+    :WaitForChild("公用")
+    :WaitForChild("幸运转盘")
+    :WaitForChild("转盘")
+
+--// UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = playerGui
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 120, 0, 50)
+button.Position = UDim2.new(0, 10, 0.5, -25) -- ซ้ายกลางจอ
+button.Text = "SPAM 30"
+button.BackgroundColor3 = Color3.fromRGB(30,30,30)
+button.TextColor3 = Color3.fromRGB(255,255,255)
+button.Parent = screenGui
+
+--// Function ยิงรีโมท
+local function fireRemote()
+    for i = 1, 30 do
+        remote:FireServer()
+        task.wait(0.03) -- ปรับได้ (ยิ่งน้อยยิ่งไว)
+    end
+end
+
+--// Click
+button.MouseButton1Click:Connect(function()
+    fireRemote()
+end)
