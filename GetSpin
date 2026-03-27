@@ -12,30 +12,50 @@ local remote = ReplicatedStorage
     :WaitForChild("幸运转盘")
     :WaitForChild("转盘")
 
---// UI
+--// GUI
 local screenGui = Instance.new("ScreenGui")
-screenGui.Parent = playerGui
+screenGui.Name = "MyGui"
 screenGui.ResetOnSpawn = false
-screenGui.DisplayOrder = 10
+screenGui.Parent = playerGui
 
+-- Main Frame (ลากได้)
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 150, 0, 80)
+frame.Position = UDim2.new(0, 20, 0.5, -40)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+-- ปุ่ม Toggle
 local button = Instance.new("TextButton")
-button.Size = UDim2.new(0, 36, 0, 36)
-button.Position = UDim2.new(1, -46, 0, 10)
-button.Text = "C"
-button.TextScaled = true
-button.BackgroundColor3 = Color3.fromRGB(30,30,30)
+button.Size = UDim2.new(1, -20, 0, 40)
+button.Position = UDim2.new(0, 10, 0, 20)
+button.Text = "OFF"
+button.BackgroundColor3 = Color3.fromRGB(40,40,40)
 button.TextColor3 = Color3.fromRGB(255,255,255)
-button.Parent = screenGui
+button.Parent = frame
 
---// Function ยิงรีโมท
-local function fireRemote()
-    for i = 1, 30 do
-        remote:FireServer()
-        task.wait(0.03) -- ปรับได้ (ยิ่งน้อยยิ่งไว)
+--// Toggle Logic
+local running = false
+
+local function spamRemote()
+    while running do
+        for i = 1, 30 do
+            remote:FireServer()
+            task.wait(0.03)
+        end
+        task.wait(0.2)
     end
 end
 
---// Click
 button.MouseButton1Click:Connect(function()
-    fireRemote()
+    running = not running
+
+    if running then
+        button.Text = "ON"
+        task.spawn(spamRemote)
+    else
+        button.Text = "OFF"
+    end
 end)
