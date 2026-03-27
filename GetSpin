@@ -3,43 +3,68 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
 
---// Remote
+--// Remote (ใช้แบบ escape 100% ชัวร์)
 local remote = ReplicatedStorage
-    :WaitForChild("单位对象")
-    :WaitForChild("公用")
-    :WaitForChild("幸运转盘")
-    :WaitForChild("转盘")
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\185\184\232\191\144\232\189\172\231\155\152")
+    :WaitForChild("\232\189\172\231\155\152")
 
 --// GUI
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "MyGui"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
+pcall(function()
+    player.PlayerGui:FindFirstChild("XGui"):Destroy()
+end)
 
--- Main Frame (ลากได้)
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 150, 0, 80)
-frame.Position = UDim2.new(0, 20, 0.5, -40)
-frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "XGui"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
 
--- ปุ่ม Toggle
-local button = Instance.new("TextButton")
-button.Size = UDim2.new(1, -20, 0, 40)
-button.Position = UDim2.new(0, 10, 0, 20)
-button.Text = "OFF"
-button.BackgroundColor3 = Color3.fromRGB(40,40,40)
-button.TextColor3 = Color3.fromRGB(255,255,255)
-button.Parent = frame
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 140, 0, 60)
+btn.Position = UDim2.new(0, 10, 0.4, 0)
+btn.BackgroundColor3 = Color3.fromRGB(0,170,255)
+btn.TextColor3 = Color3.new(1,1,1)
+btn.TextScaled = true
+btn.Text = "OFF"
+btn.Parent = gui
 
---// Toggle Logic
+--// Drag
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos
+
+btn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = btn.Position
+    end
+end)
+
+btn.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        btn.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+--// Toggle
 local running = false
 
-local function spamRemote()
+local function spam()
     while running do
         for i = 1, 30 do
             remote:FireServer()
@@ -49,13 +74,11 @@ local function spamRemote()
     end
 end
 
-button.MouseButton1Click:Connect(function()
+btn.MouseButton1Click:Connect(function()
     running = not running
+    btn.Text = running and "ON" or "OFF"
 
     if running then
-        button.Text = "ON"
-        task.spawn(spamRemote)
-    else
-        button.Text = "OFF"
+        task.spawn(spam)
     end
 end)
