@@ -170,7 +170,6 @@ end
 local function parseHerb(raw)
     if not raw or raw == "N/A" then return nil end
     local s = tostring(raw):gsub(",", ""):gsub(" ", "")
-    -- รองรับ K suffix เช่น 1862K
     local kVal = s:match("^(%d+%.?%d*)[Kk]$")
     if kVal then return math.floor(tonumber(kVal) * 1000) end
     return tonumber(s)
@@ -211,8 +210,6 @@ end
 
 -- =========================
 -- login_trigger.txt
--- เช็คว่า bash อนุญาตให้ login หรือยัง
--- bash เขียน "on" ก่อน แล้ว Lua ถึงจะเริ่ม
 -- =========================
 
 local function isLoginTriggered()
@@ -298,49 +295,39 @@ end
 
 -- =========================
 -- Daily Login
--- รันเมื่อ bash เปิด login_trigger
 -- =========================
 
 local function runDailyLogin()
-    -- เช็ค daily.txt ก่อน (ไม่ต้องรอ trigger ถ้าทำไปแล้ว)
     if isDailyDone() then return end
-
-    -- รอ bash อนุญาต (login_trigger.txt = on)
     waitForLoginTrigger()
 
     print("🔐 Daily Login starting...")
 
     local ok, err = pcall(function()
-        -- 1. Herb collect
         local vec = Vector2.new(654.7196655273438, 178.2879180908203)
         for _, num in ipairs({1,2,3,4,5}) do
             herbRemote:FireServer(num, vec)
             task.wait(0.05)
         end
 
-        -- 2. Mailbox
         mailboxRemote:FireServer()
         task.wait(0.1)
 
-        -- 3. Remote1 (1-3)
         for i = 1, 3 do
             remote1:FireServer(i)
             task.wait(0.05)
         end
 
-        -- 4. Remote2 (1-3)
         for i = 1, 3 do
             remote2:FireServer(i)
             task.wait(0.05)
         end
 
-        -- 5. Remote3 (5x)
         for i = 1, 5 do
             remote3:FireServer()
             task.wait(0.05)
         end
 
-        -- 6. RemoteA (1-5, 3x each)
         local vecA = Vector2.new(643.2603759765625, 306.132568359375)
         for num = 1, 5 do
             for _ = 1, 3 do
@@ -349,44 +336,33 @@ local function runDailyLogin()
             end
         end
 
-        -- 7. Spin wheel
         spinWheel()
 
-        -- 8. RemoteC (1-6)
         for i = 1, 6 do
             remoteC:FireServer(i)
             task.wait(0.05)
         end
 
-        -- 9. RemoteD (1-15)
         for i = 1, 15 do
             remoteD:FireServer(i)
             task.wait(0.05)
         end
 
-        -- 10. Buy herb from guild shop
         buyHerbWithRefresh()
     end)
 
     if not ok then
         print("❌ Daily Error: " .. tostring(err))
-        -- เขียน daily.txt ต่อให้ bash รู้ว่า error แต่ผ่านแล้ว
-        -- (bash จะ timeout และปิดแอพเองถ้าไม่อัปเดต)
         return
     end
 
-    -- เขียน daily.txt → bash จะเห็นและปิดแอพ
     writeDailyFile()
-
-    -- เขียน base.txt หลัง daily เสร็จ
     writeBase()
-
     print("✅ Daily Login Complete")
 end
 
 -- =========================
 -- Elixir Producer
--- รันตลอด background อ่าน stats.txt
 -- =========================
 
 local function startElixirProducer()
@@ -396,15 +372,12 @@ local function startElixirProducer()
             local content = safeRead("stats.txt")
 
             if content and content:lower():find("on") then
-                -- ยิง elixir remote
                 local eok, eerr = pcall(function()
                     elixirRemote:FireServer()
                 end)
                 if not eok then
                     print("❌ Elixir Error: " .. tostring(eerr))
                 end
-
-                -- อัปเดต base.txt ทุกรอบ (bash อ่านเพื่อเช็ค herb)
                 writeBase()
             else
                 print("⏸️ Elixir paused (stats.txt != on)")
@@ -416,13 +389,31 @@ local function startElixirProducer()
 end
 
 -- =========================
+-- Heartbeat
+-- เขียน alive.txt ทุก 30 วิตลอดเวลา
+-- bash ใช้เช็ค modified time — ถ้าเก่าเกิน = stuck/error/เน็ตตัด
+-- =========================
+
+local function startHeartbeat()
+    task.spawn(function()
+        print("💓 Heartbeat started")
+        while true do
+            -- เขียน timestamp + username กัน confusion ถ้ามีหลาย clone
+            safeWrite("alive.txt", tostring(os.time()) .. "|" .. getUsername())
+            task.wait(30)
+        end
+    end)
+end
+
+-- =========================
 -- MAIN
 -- =========================
 
--- Part 1: Daily Login
--- เช็ค daily.txt ก่อน ถ้าทำไปแล้วข้าม
--- ถ้ายังไม่ทำ รอ login_trigger.txt = on จาก bash
+-- Part 1: Heartbeat — เริ่มก่อนเลย ให้ bash เห็นตั้งแต่ script โหลด
+startHeartbeat()
+
+-- Part 2: Daily Login
 runDailyLogin()
 
--- Part 2: Elixir Producer (background loop ตลอด)
+-- Part 3: Elixir Producer (background loop)
 startElixirProducer()
