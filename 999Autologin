@@ -1,0 +1,443 @@
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- =========================
+-- Config — auto detect executor
+-- =========================
+
+local USERNAME = tostring(player.Name)
+local IS_DELTA = (type(Delta) ~= "nil") or isfolder("Delta")
+
+local WS_BASE
+if IS_DELTA then
+    WS_BASE = "Workspace/"  -- Delta: /storage/emulated/0/Delta/Workspace/
+else
+    WS_BASE = ""  -- Codex: แต่ละ clone แยก folder อยู่แล้ว
+end
+
+-- ไฟล์แยก username (Delta) หรือชื่อเดิม (Codex)
+local function fpath(name)
+    if IS_DELTA then
+        return WS_BASE .. name .. "_" .. USERNAME .. ".txt"
+    else
+        return name .. ".txt"
+    end
+end
+
+local FILE_ALIVE   = fpath("alive")
+local FILE_DAILY   = fpath("daily")
+local FILE_STATS   = fpath("stats")
+local FILE_TRIGGER = fpath("trigger")
+local FILE_BASE    = fpath("base")
+
+print("📂 Executor: " .. (IS_DELTA and "Delta" or "Codex"))
+print("📂 Files: " .. FILE_ALIVE)
+
+-- =========================
+-- Remote ทั้งหมด
+-- =========================
+
+local herbRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\134\156\231\148\176")
+    :WaitForChild("\233\135\135\233\155\134")
+
+local mailboxRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\233\130\174\228\187\182")
+    :WaitForChild("\233\162\134\229\143\150\229\133\168\233\131\168\233\130\174\228\187\182")
+
+local remote1 = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\149\134\229\186\151")
+    :WaitForChild("\233\147\182\232\161\140")
+    :WaitForChild("\233\162\134\229\143\150\231\144\134\232\180\162")
+
+local remote2 = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\149\134\229\186\151")
+    :WaitForChild("\233\147\182\232\161\140")
+    :WaitForChild("\232\180\173\228\185\176\231\144\134\232\180\162")
+
+local remote3 = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\133\172\228\188\154")
+    :WaitForChild("\230\141\144\231\140\174")
+
+local remoteA = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\230\175\143\230\151\165\228\187\187\229\138\161")
+    :WaitForChild("\233\162\134\229\143\150\229\165\150\229\138\177")
+
+local spinRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\232\189\172\231\155\152")
+    :WaitForChild("\230\138\189\229\165\150")
+
+local skipRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\232\189\172\231\155\152")
+    :WaitForChild("\233\162\134\229\165\150")
+
+local remoteC = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\232\138\130\230\151\165\230\180\187\229\138\168")
+    :WaitForChild("\233\162\134\229\143\150\229\165\150\229\138\177")
+
+local remoteD = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\230\156\136\233\128\154\232\161\140\232\175\129")
+    :WaitForChild("\229\174\140\230\136\144\228\187\187\229\138\161")
+
+local buyRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\133\172\228\188\154")
+    :WaitForChild("\229\133\145\230\141\162")
+
+local refreshRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\133\172\228\188\154")
+    :WaitForChild("\229\136\183\230\150\176\229\133\172\228\188\154\229\149\134\229\186\151")
+
+local elixirRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\231\130\188\228\184\185")
+    :WaitForChild("\229\136\182\228\189\156")
+
+-- =========================
+-- GUI Path helpers
+-- =========================
+
+local function getHerbCount()
+    local gui = playerGui:FindFirstChild("GUI")
+    if not gui then return "N/A" end
+    local obj = gui
+    local path = {
+        "\228\184\187\231\149\140\233\157\162",
+        "\228\184\187\229\159\142",
+        "\232\180\167\229\184\129\229\140\186\229\159\159",
+        "\232\141\137\232\141\175",
+        "\230\140\137\233\146\174",
+        "\229\128\188"
+    }
+    for _, name in ipairs(path) do
+        obj = obj:FindFirstChild(name)
+        if not obj then return "N/A" end
+    end
+    return tostring(obj.Text or "N/A")
+end
+
+local function getGuildCoins()
+    local gui = playerGui:FindFirstChild("GUI")
+    if not gui then return nil end
+    local n1 = gui:FindFirstChild("\228\186\140\231\186\167\231\149\140\233\157\162")
+    if not n1 then return nil end
+    local n2 = n1:FindFirstChild("\229\133\172\228\188\154")
+    if not n2 then return nil end
+    local n3 = n2:FindFirstChild("\232\131\140\230\153\175")
+    if not n3 then return nil end
+    local n4 = n3:FindFirstChild("\229\143\179\228\190\167\231\149\140\233\157\162")
+    if not n4 then return nil end
+    local n5 = n4:FindFirstChild("\229\149\134\229\186\151")
+    if not n5 then return nil end
+    local n6 = n5:FindFirstChild("\229\133\172\228\188\154\229\184\129")
+    if not n6 then return nil end
+    for _, child in pairs(n6:GetDescendants()) do
+        if child:IsA("TextLabel") or child:IsA("TextButton") then
+            local txt = tostring(child.Text or "")
+            txt = txt:gsub(",", ""):gsub(" ", "")
+            local num = tonumber(txt)
+            if num then return num end
+        end
+    end
+    return nil
+end
+
+-- =========================
+-- File helpers
+-- =========================
+
+local function safeRead(filename)
+    local ok, content = pcall(function() return readfile(filename) end)
+    if ok and content then return content end
+    return nil
+end
+
+local function safeWrite(filename, content)
+    pcall(function() writefile(filename, content) end)
+end
+
+-- =========================
+-- Date / Username
+-- =========================
+
+local function getToday()
+    local ok, result = pcall(function() return os.date("%Y-%m-%d") end)
+    if ok and result then return result end
+    return tostring(os.time())
+end
+
+local function getUsername()
+    return USERNAME
+end
+
+-- =========================
+-- Herb count → number
+-- =========================
+
+local function parseHerb(raw)
+    if not raw or raw == "N/A" then return nil end
+    local s = tostring(raw):gsub(",", ""):gsub(" ", "")
+    local kVal = s:match("^(%d+%.?%d*)[Kk]$")
+    if kVal then return math.floor(tonumber(kVal) * 1000) end
+    return tonumber(s)
+end
+
+-- =========================
+-- Write base.txt (herb count)
+-- =========================
+
+local function writeBase()
+    local herb = getHerbCount()
+    local num = parseHerb(herb)
+    local val = num and tostring(num) or tostring(herb)
+    safeWrite(FILE_BASE, val)
+    print("📦 " .. FILE_BASE .. ": " .. val)
+end
+
+-- =========================
+-- daily.txt
+-- =========================
+
+local function isDailyDone()
+    local content = safeRead(FILE_DAILY)
+    if not content then return false end
+    local today = getToday()
+    if content:find(today, 1, true) then
+        print("✅ Daily already done today (" .. today .. ") — skip")
+        return true
+    end
+    return false
+end
+
+local function writeDailyFile()
+    local content = getUsername() .. "|" .. getToday()
+    safeWrite(FILE_DAILY, content)
+    print("📅 " .. FILE_DAILY .. ": " .. content)
+end
+
+-- =========================
+-- login_trigger.txt → trigger.txt
+-- =========================
+
+local function isLoginTriggered()
+    local content = safeRead(FILE_TRIGGER)
+    if not content then return false end
+    return content:lower():find("on") ~= nil
+end
+
+local function waitForLoginTrigger()
+    print("⏳ Waiting for trigger: " .. FILE_TRIGGER)
+    while true do
+        if isLoginTriggered() then
+            print("✅ Login trigger received")
+            return
+        end
+        task.wait(3)
+    end
+end
+
+-- =========================
+-- Guild shop — ซื้อสมุนไพร
+-- =========================
+
+local function autoBuyHerb()
+    for _, obj in pairs(playerGui:GetDescendants()) do
+        if obj.Name == "\229\136\151\232\161\168"
+            and obj.Parent
+            and obj.Parent.Name == "\229\149\134\229\186\151"
+        then
+            local index = 0
+            local found = false
+            for _, child in ipairs(obj:GetChildren()) do
+                if child:IsA("Frame") then
+                    index = index + 1
+                    local nameLabel = child:FindFirstChild("\229\144\141\231\167\176", true)
+                    if nameLabel and nameLabel.Text == "Herb" then
+                        local coins = getGuildCoins()
+                        if coins and coins >= 400 then
+                            print("✅ Slot " .. index .. " = Herb | coins=" .. coins .. " → buy")
+                            buyRemote:FireServer(index)
+                            task.wait(0.2)
+                            found = true
+                        else
+                            print("⛔ Not enough coins (" .. tostring(coins) .. ")")
+                        end
+                    end
+                end
+            end
+            if not found then print("ℹ️ Herb not found in shop") end
+            return
+        end
+    end
+    print("❌ Shop list not found")
+end
+
+local function buyHerbWithRefresh()
+    autoBuyHerb()
+    task.wait(0.3)
+    local coinsLeft = getGuildCoins()
+    if coinsLeft and coinsLeft >= 400 then
+        print("🔄 Refreshing shop")
+        refreshRemote:FireServer()
+        task.wait(1.5)
+        autoBuyHerb()
+    else
+        print("ℹ️ Not enough coins to refresh")
+    end
+end
+
+-- =========================
+-- Spin wheel
+-- =========================
+
+local function spinWheel()
+    local vec = Vector2.new(494.66546630859375, 69.48560333251953)
+    for i = 1, 3 do
+        spinRemote:FireServer()
+        task.wait(0.8)
+        skipRemote:FireServer(vec, 5)
+        task.wait(0.3)
+    end
+end
+
+-- =========================
+-- Daily Login
+-- =========================
+
+local function runDailyLogin()
+    if isDailyDone() then return end
+    waitForLoginTrigger()
+
+    print("🔐 Daily Login starting...")
+
+    local ok, err = pcall(function()
+        local vec = Vector2.new(654.7196655273438, 178.2879180908203)
+        for _, num in ipairs({1,2,3,4,5}) do
+            herbRemote:FireServer(num, vec)
+            task.wait(0.05)
+        end
+
+        mailboxRemote:FireServer()
+        task.wait(0.1)
+
+        for i = 1, 3 do
+            remote1:FireServer(i)
+            task.wait(0.05)
+        end
+
+        for i = 1, 3 do
+            remote2:FireServer(i)
+            task.wait(0.05)
+        end
+
+        for i = 1, 5 do
+            remote3:FireServer()
+            task.wait(0.05)
+        end
+
+        local vecA = Vector2.new(643.2603759765625, 306.132568359375)
+        for num = 1, 5 do
+            for _ = 1, 3 do
+                remoteA:FireServer(num, vecA)
+                task.wait(0.05)
+            end
+        end
+
+        spinWheel()
+
+        for i = 1, 6 do
+            remoteC:FireServer(i)
+            task.wait(0.05)
+        end
+
+        for i = 1, 15 do
+            remoteD:FireServer(i)
+            task.wait(0.05)
+        end
+
+        buyHerbWithRefresh()
+    end)
+
+    if not ok then
+        print("❌ Daily Error: " .. tostring(err))
+        return
+    end
+
+    writeDailyFile()
+    writeBase()
+    print("✅ Daily Login Complete")
+end
+
+-- =========================
+-- Elixir Producer
+-- =========================
+
+local function startElixirProducer()
+    task.spawn(function()
+        print("⚗️ Elixir Producer started — " .. FILE_STATS)
+        while true do
+            local content = safeRead(FILE_STATS)
+
+            if content and content:lower():find("on") then
+                local eok, eerr = pcall(function()
+                    elixirRemote:FireServer()
+                end)
+                if not eok then
+                    print("❌ Elixir Error: " .. tostring(eerr))
+                end
+                writeBase()
+            else
+                print("⏸️ Elixir paused (stats != on)")
+            end
+
+            task.wait(1)
+        end
+    end)
+end
+
+-- =========================
+-- Heartbeat
+-- =========================
+
+local function startHeartbeat()
+    task.spawn(function()
+        print("💓 Heartbeat started — " .. FILE_ALIVE)
+        while true do
+            safeWrite(FILE_ALIVE, tostring(os.time()) .. "|" .. getUsername())
+            task.wait(30)
+        end
+    end)
+end
+
+-- =========================
+-- MAIN
+-- =========================
+
+startHeartbeat()
+runDailyLogin()
+startElixirProducer()
