@@ -3,6 +3,38 @@ local playerGui = player:WaitForChild("PlayerGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- =========================
+-- Config — auto detect executor
+-- =========================
+
+local USERNAME = tostring(player.Name)
+local IS_DELTA = (type(Delta) ~= "nil") or isfolder("Delta")
+
+local WS_BASE
+if IS_DELTA then
+    WS_BASE = "Workspace/"  -- Delta: /storage/emulated/0/Delta/Workspace/
+else
+    WS_BASE = ""  -- Codex: แต่ละ clone แยก folder อยู่แล้ว
+end
+
+-- ไฟล์แยก username (Delta) หรือชื่อเดิม (Codex)
+local function fpath(name)
+    if IS_DELTA then
+        return WS_BASE .. name .. "_" .. USERNAME .. ".txt"
+    else
+        return name .. ".txt"
+    end
+end
+
+local FILE_ALIVE   = fpath("alive")
+local FILE_DAILY   = fpath("daily")
+local FILE_STATS   = fpath("stats")
+local FILE_TRIGGER = fpath("trigger")
+local FILE_BASE    = fpath("base")
+
+print("📂 Executor: " .. (IS_DELTA and "Delta" or "Codex"))
+print("📂 Files: " .. FILE_ALIVE)
+
+-- =========================
 -- Remote ทั้งหมด
 -- =========================
 
@@ -160,7 +192,7 @@ local function getToday()
 end
 
 local function getUsername()
-    return tostring(player.Name)
+    return USERNAME
 end
 
 -- =========================
@@ -176,15 +208,15 @@ local function parseHerb(raw)
 end
 
 -- =========================
--- Write base.txt
+-- Write base.txt (herb count)
 -- =========================
 
 local function writeBase()
     local herb = getHerbCount()
     local num = parseHerb(herb)
     local val = num and tostring(num) or tostring(herb)
-    safeWrite("base.txt", val)
-    print("📦 base.txt: " .. val)
+    safeWrite(FILE_BASE, val)
+    print("📦 " .. FILE_BASE .. ": " .. val)
 end
 
 -- =========================
@@ -192,7 +224,7 @@ end
 -- =========================
 
 local function isDailyDone()
-    local content = safeRead("daily.txt")
+    local content = safeRead(FILE_DAILY)
     if not content then return false end
     local today = getToday()
     if content:find(today, 1, true) then
@@ -204,22 +236,22 @@ end
 
 local function writeDailyFile()
     local content = getUsername() .. "|" .. getToday()
-    safeWrite("daily.txt", content)
-    print("📅 daily.txt: " .. content)
+    safeWrite(FILE_DAILY, content)
+    print("📅 " .. FILE_DAILY .. ": " .. content)
 end
 
 -- =========================
--- login_trigger.txt
+-- login_trigger.txt → trigger.txt
 -- =========================
 
 local function isLoginTriggered()
-    local content = safeRead("login_trigger.txt")
+    local content = safeRead(FILE_TRIGGER)
     if not content then return false end
     return content:lower():find("on") ~= nil
 end
 
 local function waitForLoginTrigger()
-    print("⏳ Waiting for login_trigger.txt = on ...")
+    print("⏳ Waiting for trigger: " .. FILE_TRIGGER)
     while true do
         if isLoginTriggered() then
             print("✅ Login trigger received")
@@ -367,9 +399,9 @@ end
 
 local function startElixirProducer()
     task.spawn(function()
-        print("⚗️ Elixir Producer started")
+        print("⚗️ Elixir Producer started — " .. FILE_STATS)
         while true do
-            local content = safeRead("stats.txt")
+            local content = safeRead(FILE_STATS)
 
             if content and content:lower():find("on") then
                 local eok, eerr = pcall(function()
@@ -380,7 +412,7 @@ local function startElixirProducer()
                 end
                 writeBase()
             else
-                print("⏸️ Elixir paused (stats.txt != on)")
+                print("⏸️ Elixir paused (stats != on)")
             end
 
             task.wait(1)
@@ -390,17 +422,35 @@ end
 
 -- =========================
 -- Heartbeat
--- เขียน alive.txt ทุก 30 วิตลอดเวลา
--- bash ใช้เช็ค modified time — ถ้าเก่าเกิน = stuck/error/เน็ตตัด
 -- =========================
 
 local function startHeartbeat()
     task.spawn(function()
-        print("💓 Heartbeat started")
+        print("💓 Heartbeat started — " .. FILE_ALIVE)
         while true do
-            -- เขียน timestamp + username กัน confusion ถ้ามีหลาย clone
-            safeWrite("alive.txt", tostring(os.time()) .. "|" .. getUsername())
+            safeWrite(FILE_ALIVE, tostring(os.time()) .. "|" .. getUsername())
             task.wait(30)
+        end
+    end)
+end
+
+-- =========================
+-- Kick trigger — bash เขียน "kick" → Lua เตะตัวเองออก
+-- ใช้ตอน daily done ให้ app กลับหน้า home → cookie ใหม่มีผล
+-- =========================
+
+local function startKickWatcher()
+    task.spawn(function()
+        print("👢 Kick watcher started — " .. FILE_TRIGGER)
+        while true do
+            local content = safeRead(FILE_TRIGGER)
+            if content and content:lower():find("kick") then
+                print("👢 Kick trigger received — disconnecting")
+                safeWrite(FILE_TRIGGER, "off")
+                player:Kick("Daily swap — reconnecting")
+                return
+            end
+            task.wait(3)
         end
     end)
 end
@@ -409,11 +459,7 @@ end
 -- MAIN
 -- =========================
 
--- Part 1: Heartbeat — เริ่มก่อนเลย ให้ bash เห็นตั้งแต่ script โหลด
 startHeartbeat()
-
--- Part 2: Daily Login
+startKickWatcher()
 runDailyLogin()
-
--- Part 3: Elixir Producer (background loop)
 startElixirProducer()
