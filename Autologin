@@ -28,8 +28,15 @@ end
 local FILE_ALIVE   = fpath("alive")
 local FILE_DAILY   = fpath("daily")
 local FILE_STATS   = fpath("stats")
-local FILE_TRIGGER = fpath("trigger")
 local FILE_BASE    = fpath("base")
+
+-- trigger: Codex ใช้ login_trigger.txt, Delta ใช้ trigger_username.txt
+local FILE_TRIGGER
+if IS_DELTA then
+    FILE_TRIGGER = WS_BASE .. "trigger_" .. USERNAME .. ".txt"
+else
+    FILE_TRIGGER = "login_trigger.txt"
+end
 
 print("📂 Executor: " .. (IS_DELTA and "Delta" or "Codex"))
 print("📂 Files: " .. FILE_ALIVE)
