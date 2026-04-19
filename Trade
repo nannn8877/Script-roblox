@@ -28,8 +28,8 @@ local MY_NAME = LP.Name
 
 -- ═══ Config ═══
 local TRADE_TIMEOUT = 120       -- overall sender timeout
-local ADD_CLICK_COUNT = 30      -- click tab N times (each click adds ~1-2 items)
-local ADD_CLICK_DELAY = 0.2     -- delay between clicks
+local ADD_CLICK_COUNT = 40      -- pair-clicks (2 clicks each = 80 total clicks)
+local ADD_CLICK_DELAY = 0.15    -- delay between pair-clicks
 local RECEIVER_HEARTBEAT = 10   -- receiver write ready.txt every N sec
 
 -- ═══ Bytes (UTF-8 chinese strings) ═══
@@ -357,33 +357,21 @@ local function runSender()
   end
   logLine("  ✓ tab found: " .. foundPath)
 
-  -- ปุ่ม 丹药 ใช้ firesignal ไม่ได้ — ต้อง real touch ผ่าน VirtualInputManager
-  local VIM = game:GetService("VirtualInputManager")
-
-  local function realClick(btn)
-    local pos = btn.AbsolutePosition
-    local size = btn.AbsoluteSize
-    local x = pos.X + size.X / 2
-    local y = pos.Y + size.Y / 2
-    -- ส่ง touch (mobile) — Roblox ใช้ touch events
-    pcall(function()
-      VIM:SendTouchEvent(1, 0, x, y)  -- 0 = touch begin
-      task.wait(0.05)
-      VIM:SendTouchEvent(1, 2, x, y)  -- 2 = touch end
-    end)
-  end
-
-  -- [SWITCH TAB] กด 1 ครั้งเพื่อสลับมาที่ tab 丹药
-  logLine("  → switch to elixir tab (real touch)")
-  realClick(elixirTab)
+  -- ปุ่ม 丹药: firesignal ใช้ได้ แต่ต้อง click 2 ครั้ง/รอบ (1=select, 2=add)
+  -- เพิ่มจำนวนเป็น ADD_CLICK_COUNT*2 เพื่อกัน case ยาเยอะ
+  -- [SWITCH TAB] กดสลับมาที่ tab 丹药 ก่อน
+  logLine("  → switch to elixir tab")
+  pcall(function() firesignal(elixirTab.Activated) end)
   task.wait(1.0)
 
-  -- [ADD ALL] กดเพิ่มอีก N ครั้ง (real touch)
+  -- [ADD ALL] click pair (2 clicks ติดกัน) × N รอบ
   for i = 1, ADD_CLICK_COUNT do
-    realClick(elixirTab)
-    logLine(("  add #%d: real-click"):format(i))
+    pcall(function() firesignal(elixirTab.Activated) end)
+    task.wait(0.05)
+    pcall(function() firesignal(elixirTab.Activated) end)
     task.wait(ADD_CLICK_DELAY)
   end
+  logLine(("  ✓ pressed %d × 2 clicks"):format(ADD_CLICK_COUNT))
 
   -- wait UI/server sync
   task.wait(1.5)
