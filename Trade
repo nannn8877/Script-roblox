@@ -320,43 +320,64 @@ local function runSender()
     return
   end
 
-  -- path: GUI.二级界面.交易.交易界面.我的背包.标签.丹药
+  -- WAIT for trade UI to render (สำคัญ — UI ไม่โผล่ทันที)
+  task.wait(2)
+
+  -- หา elixir tab — ลอง 10 รอบ (UI อาจ render ช้า)
   local elixirTab = nil
   local foundPath
-  for _, desc in pairs(gui:GetDescendants()) do
-    if (desc:IsA("TextButton") or desc:IsA("ImageButton")) and desc.Name == B_ELIXIR then
-      local full = desc:GetFullName()
-      if full:find(B_TRADE, 1, true) and full:find(B_MY_BAG, 1, true) then
-        elixirTab = desc
-        foundPath = full
-        break
+  for attempt = 1, 10 do
+    for _, desc in pairs(gui:GetDescendants()) do
+      if (desc:IsA("TextButton") or desc:IsA("ImageButton")) and desc.Name == B_ELIXIR then
+        local full = desc:GetFullName()
+        if full:find(B_TRADE, 1, true) and full:find(B_MY_BAG, 1, true) then
+          elixirTab = desc
+          foundPath = full
+          break
+        end
       end
     end
+    if elixirTab then break end
+    logLine(("  attempt %d: tab not found, wait 1s"):format(attempt))
+    task.wait(1)
   end
 
   if not elixirTab then
-    logLine("❌ elixir tab not found — UI not ready?")
+    logLine("❌ elixir tab not found after 10s")
+    -- dump tradeUI for debug
+    for _, d in pairs(gui:GetDescendants()) do
+      if d:IsA("TextButton") and d:GetFullName():find(B_TRADE, 1, true) then
+        logLine("  btn: " .. d:GetFullName():sub(-100))
+      end
+    end
     pcall(function() R_CANCEL:FireServer() end)
     connSync:Disconnect(); connPopup:Disconnect()
     writeFileSafe("trade_fail.txt", "no elixir tab")
     return
   end
-  logLine("  tab: " .. foundPath)
+  logLine("  ✓ tab found: " .. foundPath)
 
+  -- Verify firesignal
   if not firesignal then
-    logLine("❌ no firesignal — executor limited")
-    pcall(function() R_CANCEL:FireServer() end)
-    connSync:Disconnect(); connPopup:Disconnect()
-    writeFileSafe("trade_fail.txt", "no firesignal")
-    return
-  end
-
-  for i = 1, ADD_CLICK_COUNT do
-    pcall(function()
-      firesignal(elixirTab.MouseButton1Click)
-      firesignal(elixirTab.Activated)
-    end)
-    task.wait(ADD_CLICK_DELAY)
+    logLine("❌ executor missing firesignal — try VirtualInputManager fallback")
+    -- fallback: เล็งคลิกผ่าน VIM (อาจไม่ทำงานทุก executor)
+    local VIM = game:GetService("VirtualInputManager")
+    for i = 1, ADD_CLICK_COUNT do
+      local pos = elixirTab.AbsolutePosition + elixirTab.AbsoluteSize / 2
+      pcall(function()
+        VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
+        VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
+      end)
+      task.wait(ADD_CLICK_DELAY)
+    end
+  else
+    -- normal firesignal
+    for i = 1, ADD_CLICK_COUNT do
+      local ok1 = pcall(function() firesignal(elixirTab.MouseButton1Click) end)
+      local ok2 = pcall(function() firesignal(elixirTab.Activated) end)
+      logLine(("  click #%d: MB1=%s Activated=%s"):format(i, tostring(ok1), tostring(ok2)))
+      task.wait(ADD_CLICK_DELAY)
+    end
   end
 
   -- wait UI/server sync
