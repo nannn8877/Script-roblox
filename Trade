@@ -117,6 +117,23 @@ local function runReceiver()
     end
   end)
 
+  -- === Listen invite popup (打开倒计时框) ===
+  -- Fire ทันทีที่มี trade invite — ก่อน sync จะตอบกลับ
+  if R_INVITE then
+    R_INVITE.OnClientEvent:Connect(function(msg, fromPlayer)
+      logLine(("← INVITE popup: msg=%s from=%s"):format(tostring(msg), tostring(fromPlayer)))
+      if STATE == "IDLE" then
+        -- extract sender name from message: "<NAME> has invited you to trade"
+        if type(msg) == "string" then
+          local senderName = msg:match("^(.+) has invited") or msg:match("^(%S+)")
+          currentPartner = senderName
+        end
+        STATE = "ACCEPTING"
+        stateStart = tick()
+      end
+    end)
+  end
+
   -- === Listen trade sync ===
   R_SYNC.OnClientEvent:Connect(function(data)
     if type(data) ~= "table" then return end
@@ -131,29 +148,25 @@ local function runReceiver()
       if name ~= MY_NAME then partner = name end
     end
 
-    -- Find partner userId
-    local lockDict = data[B_LOCK_DICT] or {}
-    for uid, _ in pairs(data[data[B_PLAYER_LIST] and B_PLAYER_LIST or ""] or {}) do
-      -- skip — use items key instead
-    end
+    -- Find partner userId from items
     local itemsData = data[B_PLAYER_ITEMS] or {}
     for uid, _ in pairs(itemsData) do
       if tostring(uid) ~= myUserId then partnerId = tostring(uid) end
     end
 
-    -- state transitions
-    if STATE == "IDLE" then
-      if partner then
-        currentPartner = partner
-        STATE = "ACCEPTING"
-        stateStart = tick()
-        logLine("← trade invite from " .. partner)
-      end
-    elseif STATE == "WAIT_B_LOCK" then
-      if partnerId and lockDict[partnerId] == true then
-        STATE = "SELF_LOCK"
-        logLine("  B locked → self lock")
-      end
+    -- Backup trigger: ถ้ายัง IDLE แต่ sync มาแสดงว่ามี trade เริ่ม
+    if STATE == "IDLE" and partner then
+      currentPartner = partner
+      STATE = "ACCEPTING"
+      stateStart = tick()
+      logLine("← trade detected via sync: " .. partner)
+    end
+
+    -- check B locked
+    local lockDict = data[B_LOCK_DICT] or {}
+    if STATE == "WAIT_B_LOCK" and partnerId and lockDict[partnerId] == true then
+      STATE = "SELF_LOCK"
+      logLine("  B locked → self lock")
     end
   end)
 
@@ -180,12 +193,12 @@ local function runReceiver()
       pcall(function() R_REQUEST:FireServer() end)  -- empty fire = accept
       STATE = "WAIT_B_LOCK"
       stateStart = tick()
-      logLine("  accepted")
+      logLine("  → accepted (FireServer 申请交易 empty)")
     elseif STATE == "SELF_LOCK" then
       pcall(function() R_LOCK:FireServer(true) end)
       STATE = "WAIT_COMPLETE"
       stateStart = tick()
-      logLine("  self locked")
+      logLine("  → self locked")
     elseif STATE == "WAIT_B_LOCK" then
       if tick() - stateStart > 60 then
         logLine("⏱ timeout waiting B lock → cancel")
