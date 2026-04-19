@@ -376,35 +376,32 @@ local function runSender()
   -- wait UI/server sync
   task.wait(1.5)
 
-  if not bAdded then
-    logLine("⊘ no elixirs in bag — cancel")
-    pcall(function() R_CANCEL:FireServer() end)
-    connSync:Disconnect(); connPopup:Disconnect()
-    writeFileSafe("trade_empty.txt", MY_NAME)
-    return
+  if bAdded then
+    logLine("  ✓ elixirs added")
+  else
+    logLine("  ⊘ no elixirs in bag — lock anyway (empty trade)")
   end
-  logLine("  ✓ elixirs added")
 
   -- ═══ [4] Lock ═══
   logLine("[4] Lock")
   pcall(function() R_LOCK:FireServer(true) end)
 
-  -- wait A lock
+  -- wait A lock (60s — A's receiver loop รอ B lock + setup ใช้เวลา)
   local t2 = tick()
-  while tick() - t2 < 30 do
+  while tick() - t2 < 60 do
     if aLocked then break end
     if completed then break end
     task.wait(0.5)
   end
 
   if not aLocked and not completed then
-    logLine("⏱ timeout waiting A lock")
+    logLine("⏱ timeout waiting A lock (60s)")
     pcall(function() R_CANCEL:FireServer() end)
     connSync:Disconnect(); connPopup:Disconnect()
     writeFileSafe("trade_timeout.txt", "A no lock")
     return
   end
-  logLine("  ✓ A locked")
+  logLine("  ✓ A locked (took " .. math.floor(tick() - t2) .. "s)")
 
   -- ═══ [5] Wait completion ═══
   logLine("[5] Wait completion (5s countdown)")
@@ -418,8 +415,13 @@ local function runSender()
   connPopup:Disconnect()
 
   if completeMsg == "done" then
-    logLine("✓ TRADE SUCCESS")
-    writeFileSafe("trade_done.txt", MY_NAME .. ":" .. target)
+    if bAdded then
+      logLine("✓ TRADE SUCCESS (with elixirs)")
+      writeFileSafe("trade_done.txt", MY_NAME .. ":" .. target)
+    else
+      logLine("✓ TRADE SUCCESS (empty)")
+      writeFileSafe("trade_empty.txt", MY_NAME .. ":" .. target)
+    end
   elseif completeMsg == "cancelled" then
     logLine("✗ TRADE CANCELLED")
     writeFileSafe("trade_fail.txt", "cancelled")
