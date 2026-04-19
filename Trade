@@ -23,7 +23,19 @@
 
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
+
+-- ⏳ Wait for LocalPlayer (autoexec อาจรันก่อน LP โหลด)
 local LP = Players.LocalPlayer
+if not LP then
+  repeat task.wait(0.1) until Players.LocalPlayer
+  LP = Players.LocalPlayer
+end
+
+-- Wait for character (กัน LP.Name nil)
+if not LP.Character then
+  LP.CharacterAdded:Wait()
+end
+
 local MY_NAME = LP.Name
 
 -- ═══ Config ═══
@@ -43,24 +55,6 @@ local B_PLAYER_LIST = "\228\186\164\230\152\147\231\142\169\229\174\182\229\136\
 local B_PLAYER_ITEMS = "\231\142\169\229\174\182\228\186\164\230\152\147\231\137\169\229\147\129\230\149\176\230\141\174"  -- 玩家交易物品数据
 local B_LOCK_DICT = "\231\142\169\229\174\182\233\148\129\229\174\154\229\173\151\229\133\184"  -- 玩家锁定字典
 
--- ═══ Remote paths ═══
-local function getRemote(folder, name)
-  local node = RS
-  for part in folder:gmatch("[^.]+") do
-    node = node:WaitForChild(part, 10)
-    if not node then return nil end
-  end
-  return node:WaitForChild(name, 10)
-end
-
-local BASE = "\228\186\139\228\187\182.\229\133\172\231\148\168"  -- 事件.公用
-local R_REQUEST = getRemote(BASE .. "." .. B_TRADE, "\231\148\179\232\175\183\228\186\164\230\152\147")  -- 申请交易
-local R_LOCK    = getRemote(BASE .. "." .. B_TRADE, "\233\148\129\229\174\154\228\186\164\230\152\147")  -- 锁定交易
-local R_CANCEL  = getRemote(BASE .. "." .. B_TRADE, "\229\143\150\230\182\136\228\186\164\230\152\147")  -- 取消交易
-local R_SYNC    = getRemote(BASE .. "." .. B_TRADE, "\228\186\164\230\152\147\230\149\176\230\141\174\229\144\140\230\173\165")  -- 交易数据同步
-local R_POPUP   = getRemote(BASE .. ".UI", B_UI_POPUP)
-local R_INVITE  = getRemote(BASE .. ".UI", B_UI_INVITE)
-
 -- ═══ Helpers ═══
 local function readFileSafe(path)
   if not isfile or not isfile(path) then return "" end
@@ -73,9 +67,10 @@ local function writeFileSafe(path, content)
 end
 
 local function logLine(msg)
-  local stamp = os.date("%H:%M:%S")
+  local stamp = "??:??:??"
+  pcall(function() stamp = os.date("%H:%M:%S") end)
   local line = ("[%s] %s\n"):format(stamp, msg)
-  print("[TRADE] " .. msg)
+  pcall(function() print("[TRADE] " .. msg) end)
   if appendfile then
     pcall(appendfile, "trade_log.txt", line)
   else
@@ -84,11 +79,46 @@ local function logLine(msg)
   end
 end
 
--- ═══ Check role ═══
+-- เขียน "BOOT" ทันทีตอน script เริ่ม → ถ้าเห็นบรรทัดนี้ใน trade_log = script รันแน่นอน
+logLine("══════ TRADE.LUA BOOT ══════")
+logLine("MY_NAME = " .. tostring(MY_NAME))
+
+-- ═══ Check role FIRST (ก่อน resolve remote ใดๆ) ═══
 local receiverName = readFileSafe("receiver_name.txt"):gsub("%s+", "")
 local tradeStart = readFileSafe("trade_start.txt"):gsub("%s+", "")
 
 logLine(("Init: me=%s, receiver=%s, trade_start=%s"):format(MY_NAME, receiverName, tradeStart))
+
+-- ⚡ Early exit ถ้าไม่ใช่ trade role — ไม่ต้องเสียเวลา resolve remote
+if MY_NAME ~= receiverName and tradeStart ~= "1" then
+  logLine("(farm mode — trade script idle, exit)")
+  return
+end
+
+-- ═══ Resolve remotes (เฉพาะกรณี role = trade) ═══
+local function getRemote(folder, name)
+  local ok, result = pcall(function()
+    local node = RS
+    for part in folder:gmatch("[^.]+") do
+      node = node:WaitForChild(part, 5)
+      if not node then return nil end
+    end
+    return node:WaitForChild(name, 5)
+  end)
+  return ok and result or nil
+end
+
+local BASE = "\228\186\139\228\187\182.\229\133\172\231\148\168"  -- 事件.公用
+local R_REQUEST = getRemote(BASE .. "." .. B_TRADE, "\231\148\179\232\175\183\228\186\164\230\152\147")  -- 申请交易
+local R_LOCK    = getRemote(BASE .. "." .. B_TRADE, "\233\148\129\229\174\154\228\186\164\230\152\147")  -- 锁定交易
+local R_CANCEL  = getRemote(BASE .. "." .. B_TRADE, "\229\143\150\230\182\136\228\186\164\230\152\147")  -- 取消交易
+local R_SYNC    = getRemote(BASE .. "." .. B_TRADE, "\228\186\164\230\152\147\230\149\176\230\141\174\229\144\140\230\173\165")  -- 交易数据同步
+local R_POPUP   = getRemote(BASE .. ".UI", B_UI_POPUP)
+local R_INVITE  = getRemote(BASE .. ".UI", B_UI_INVITE)
+
+logLine(("Remotes: req=%s lock=%s sync=%s popup=%s invite=%s"):format(
+  tostring(R_REQUEST ~= nil), tostring(R_LOCK ~= nil),
+  tostring(R_SYNC ~= nil), tostring(R_POPUP ~= nil), tostring(R_INVITE ~= nil)))
 
 -- Verify remotes
 if not R_REQUEST or not R_LOCK or not R_SYNC then
