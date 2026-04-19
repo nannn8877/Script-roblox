@@ -1,0 +1,414 @@
+-- ============================================================
+-- trade.lua — Auto-trade dispatcher (autoexec)
+-- ============================================================
+-- Role detection:
+--   if LocalPlayer.Name == receiver_name.txt → run RECEIVER loop
+--   if trade_start.txt == "1"                 → run SENDER once
+--   else                                      → exit (ปกติ farm)
+-- 
+-- ไฟล์ในแต่ละ Codex workspace (per-pkg):
+--   INPUT (bash writes):
+--     receiver_name.txt  = ชื่อ A acc
+--     trade_target.txt   = ชื่อ A (for sender)
+--     trade_start.txt    = "1" = trigger sender
+--   OUTPUT (lua writes):
+--     receiver_ready.txt = timestamp (A ready)
+--     trade_done.txt     = "ok:username"
+--     trade_fail.txt     = "reason"
+--     trade_empty.txt    = "no elixir"
+--     trade_no_target.txt
+--     trade_timeout.txt
+--     trade_log.txt      = log of events
+-- ============================================================
+
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local LP = Players.LocalPlayer
+local MY_NAME = LP.Name
+
+-- ═══ Config ═══
+local TRADE_TIMEOUT = 120       -- overall sender timeout
+local ADD_CLICK_COUNT = 5       -- click tab N times
+local ADD_CLICK_DELAY = 0.2     -- delay between clicks
+local RECEIVER_HEARTBEAT = 10   -- receiver write ready.txt every N sec
+
+-- ═══ Bytes (UTF-8 chinese strings) ═══
+local B_TRADE   = "\228\186\164\230\152\147"        -- 交易
+local B_ELIXIR  = "\228\184\185\232\141\175"        -- 丹药
+local B_MY_BAG  = "\230\136\145\231\154\132\232\131\140\229\140\133"  -- 我的背包
+local B_LABELS  = "\230\160\135\231\173\190"        -- 标签
+local B_UI_POPUP = "\230\137\147\229\188\128\229\188\185\229\135\186\230\161\134"  -- 打开弹出框
+local B_UI_INVITE = "\230\137\147\229\188\128\229\128\146\232\174\161\230\151\182\230\161\134"  -- 打开倒计时框
+local B_PLAYER_LIST = "\228\186\164\230\152\147\231\142\169\229\174\182\229\136\151\232\161\168"  -- 交易玩家列表
+local B_PLAYER_ITEMS = "\231\142\169\229\174\182\228\186\164\230\152\147\231\137\169\229\147\129\230\149\176\230\141\174"  -- 玩家交易物品数据
+local B_LOCK_DICT = "\231\142\169\229\174\182\233\148\129\229\174\154\229\173\151\229\133\184"  -- 玩家锁定字典
+
+-- ═══ Remote paths ═══
+local function getRemote(folder, name)
+  local node = RS
+  for part in folder:gmatch("[^.]+") do
+    node = node:WaitForChild(part, 10)
+    if not node then return nil end
+  end
+  return node:WaitForChild(name, 10)
+end
+
+local BASE = "\228\186\139\228\187\182.\229\133\172\231\148\168"  -- 事件.公用
+local R_REQUEST = getRemote(BASE .. "." .. B_TRADE, "\231\148\179\232\175\183\228\186\164\230\152\147")  -- 申请交易
+local R_LOCK    = getRemote(BASE .. "." .. B_TRADE, "\233\148\129\229\174\154\228\186\164\230\152\147")  -- 锁定交易
+local R_CANCEL  = getRemote(BASE .. "." .. B_TRADE, "\229\143\150\230\182\136\228\186\164\230\152\147")  -- 取消交易
+local R_SYNC    = getRemote(BASE .. "." .. B_TRADE, "\228\186\164\230\152\147\230\149\176\230\141\174\229\144\140\230\173\165")  -- 交易数据同步
+local R_POPUP   = getRemote(BASE .. ".UI", B_UI_POPUP)
+local R_INVITE  = getRemote(BASE .. ".UI", B_UI_INVITE)
+
+-- ═══ Helpers ═══
+local function readFileSafe(path)
+  if not isfile or not isfile(path) then return "" end
+  local ok, data = pcall(readfile, path)
+  return (ok and data) or ""
+end
+
+local function writeFileSafe(path, content)
+  if writefile then pcall(writefile, path, tostring(content or "")) end
+end
+
+local function logLine(msg)
+  local stamp = os.date("%H:%M:%S")
+  local line = ("[%s] %s\n"):format(stamp, msg)
+  print("[TRADE] " .. msg)
+  if appendfile then
+    pcall(appendfile, "trade_log.txt", line)
+  else
+    local old = readFileSafe("trade_log.txt")
+    writeFileSafe("trade_log.txt", old .. line)
+  end
+end
+
+-- ═══ Check role ═══
+local receiverName = readFileSafe("receiver_name.txt"):gsub("%s+", "")
+local tradeStart = readFileSafe("trade_start.txt"):gsub("%s+", "")
+
+logLine(("Init: me=%s, receiver=%s, trade_start=%s"):format(MY_NAME, receiverName, tradeStart))
+
+-- Verify remotes
+if not R_REQUEST or not R_LOCK or not R_SYNC then
+  logLine("❌ Missing trade remotes — abort")
+  writeFileSafe("trade_fail.txt", "remotes not found")
+  return
+end
+
+-- ============================================================
+-- RECEIVER (A)
+-- ============================================================
+local function runReceiver()
+  logLine("★ RECEIVER mode — " .. MY_NAME)
+  writeFileSafe("receiver_ready.txt", tostring(os.time()))
+
+  local STATE = "IDLE"
+  local stateStart = tick()
+  local currentPartner = nil
+  local myUserId = tostring(LP.UserId)
+
+  -- heartbeat loop
+  task.spawn(function()
+    while true do
+      task.wait(RECEIVER_HEARTBEAT)
+      writeFileSafe("receiver_ready.txt", tostring(os.time()))
+    end
+  end)
+
+  -- === Listen trade sync ===
+  R_SYNC.OnClientEvent:Connect(function(data)
+    if type(data) ~= "table" then return end
+
+    local playerList = data[B_PLAYER_LIST]
+    if type(playerList) ~= "table" then return end
+
+    -- Find partner (not me)
+    local partner = nil
+    local partnerId = nil
+    for _, name in pairs(playerList) do
+      if name ~= MY_NAME then partner = name end
+    end
+
+    -- Find partner userId
+    local lockDict = data[B_LOCK_DICT] or {}
+    for uid, _ in pairs(data[data[B_PLAYER_LIST] and B_PLAYER_LIST or ""] or {}) do
+      -- skip — use items key instead
+    end
+    local itemsData = data[B_PLAYER_ITEMS] or {}
+    for uid, _ in pairs(itemsData) do
+      if tostring(uid) ~= myUserId then partnerId = tostring(uid) end
+    end
+
+    -- state transitions
+    if STATE == "IDLE" then
+      if partner then
+        currentPartner = partner
+        STATE = "ACCEPTING"
+        stateStart = tick()
+        logLine("← trade invite from " .. partner)
+      end
+    elseif STATE == "WAIT_B_LOCK" then
+      if partnerId and lockDict[partnerId] == true then
+        STATE = "SELF_LOCK"
+        logLine("  B locked → self lock")
+      end
+    end
+  end)
+
+  -- === Listen popup (complete/cancel) ===
+  R_POPUP.OnClientEvent:Connect(function(_, msg)
+    if type(msg) ~= "string" then return end
+    if msg:find("Successful") or msg:find("成功") then
+      logLine("✓ trade success with " .. (currentPartner or "?"))
+      STATE = "IDLE"
+      currentPartner = nil
+    elseif msg:find("Cancel") or msg:find("取消") then
+      logLine("✗ trade cancelled")
+      STATE = "IDLE"
+      currentPartner = nil
+    end
+  end)
+
+  -- === Main loop ===
+  while true do
+    task.wait(0.5)
+
+    if STATE == "ACCEPTING" then
+      task.wait(0.5)
+      pcall(function() R_REQUEST:FireServer() end)  -- empty fire = accept
+      STATE = "WAIT_B_LOCK"
+      stateStart = tick()
+      logLine("  accepted")
+    elseif STATE == "SELF_LOCK" then
+      pcall(function() R_LOCK:FireServer(true) end)
+      STATE = "WAIT_COMPLETE"
+      stateStart = tick()
+      logLine("  self locked")
+    elseif STATE == "WAIT_B_LOCK" then
+      if tick() - stateStart > 60 then
+        logLine("⏱ timeout waiting B lock → cancel")
+        pcall(function() R_CANCEL:FireServer() end)
+        STATE = "IDLE"
+        currentPartner = nil
+      end
+    elseif STATE == "WAIT_COMPLETE" then
+      if tick() - stateStart > 30 then
+        logLine("⏱ timeout waiting complete")
+        STATE = "IDLE"
+        currentPartner = nil
+      end
+    end
+  end
+end
+
+-- ============================================================
+-- SENDER (B)
+-- ============================================================
+local function runSender()
+  local target = readFileSafe("trade_target.txt"):gsub("%s+", "")
+  logLine("★ SENDER mode — " .. MY_NAME .. " → " .. target)
+
+  if target == "" then
+    logLine("❌ empty target")
+    writeFileSafe("trade_fail.txt", "empty target")
+    return
+  end
+
+  -- clear start flag so won't re-run on reconnect
+  writeFileSafe("trade_start.txt", "0")
+
+  local myUserId = tostring(LP.UserId)
+
+  -- ═══ [1] Wait for target in Players ═══
+  logLine("[1] Wait for target...")
+  local targetPlayer = nil
+  local deadline = tick() + 30
+  while tick() < deadline do
+    targetPlayer = Players:FindFirstChild(target)
+    if targetPlayer then break end
+    task.wait(1)
+  end
+  if not targetPlayer then
+    logLine("❌ target not in server: " .. target)
+    writeFileSafe("trade_no_target.txt", target)
+    return
+  end
+  logLine("  ✓ found " .. target)
+
+  -- ═══ [2] Request trade ═══
+  logLine("[2] Request trade")
+  -- Setup sync listener
+  local state = "REQUESTING"
+  local tradeOpened = false
+  local bAdded = false  -- I added items
+  local aLocked = false
+  local completed = false
+  local completeMsg = nil
+
+  local connSync = R_SYNC.OnClientEvent:Connect(function(data)
+    if type(data) ~= "table" then return end
+    local pl = data[B_PLAYER_LIST]
+    if type(pl) == "table" and #pl >= 2 then
+      tradeOpened = true
+    end
+    -- check my items added
+    local items = data[B_PLAYER_ITEMS] or {}
+    local myItems = items[myUserId]
+    if type(myItems) == "table" then
+      local elx = myItems[B_ELIXIR]
+      if type(elx) == "table" then
+        local c = 0
+        for _ in pairs(elx) do c = c + 1 end
+        if c > 0 then bAdded = true end
+      end
+    end
+    -- check A locked
+    local lockD = data[B_LOCK_DICT] or {}
+    for uid, v in pairs(lockD) do
+      if tostring(uid) ~= myUserId and v == true then
+        aLocked = true
+      end
+    end
+  end)
+
+  local connPopup = R_POPUP.OnClientEvent:Connect(function(_, msg)
+    if type(msg) ~= "string" then return end
+    if msg:find("Successful") or msg:find("成功") then
+      completed = true; completeMsg = "done"
+    elseif msg:find("Cancel") or msg:find("取消") then
+      completed = true; completeMsg = "cancelled"
+    end
+  end)
+
+  pcall(function() R_REQUEST:FireServer(targetPlayer) end)
+
+  -- wait trade window opens
+  local t1 = tick()
+  while tick() - t1 < 15 do
+    if tradeOpened then break end
+    task.wait(0.5)
+  end
+  if not tradeOpened then
+    logLine("⏱ timeout waiting A accept")
+    connSync:Disconnect(); connPopup:Disconnect()
+    writeFileSafe("trade_timeout.txt", "A no accept")
+    return
+  end
+  logLine("  ✓ trade opened")
+
+  -- ═══ [3] Add elixirs (click 丹药 tab × N) ═══
+  logLine("[3] Add elixirs via tab click")
+  local gui = LP:WaitForChild("PlayerGui", 10)
+  if not gui then
+    writeFileSafe("trade_fail.txt", "no PlayerGui")
+    connSync:Disconnect(); connPopup:Disconnect()
+    return
+  end
+
+  -- path: GUI.二级界面.交易.交易界面.我的背包.标签.丹药
+  local elixirTab = nil
+  local foundPath
+  for _, desc in pairs(gui:GetDescendants()) do
+    if (desc:IsA("TextButton") or desc:IsA("ImageButton")) and desc.Name == B_ELIXIR then
+      local full = desc:GetFullName()
+      if full:find(B_TRADE, 1, true) and full:find(B_MY_BAG, 1, true) then
+        elixirTab = desc
+        foundPath = full
+        break
+      end
+    end
+  end
+
+  if not elixirTab then
+    logLine("❌ elixir tab not found — UI not ready?")
+    pcall(function() R_CANCEL:FireServer() end)
+    connSync:Disconnect(); connPopup:Disconnect()
+    writeFileSafe("trade_fail.txt", "no elixir tab")
+    return
+  end
+  logLine("  tab: " .. foundPath)
+
+  if not firesignal then
+    logLine("❌ no firesignal — executor limited")
+    pcall(function() R_CANCEL:FireServer() end)
+    connSync:Disconnect(); connPopup:Disconnect()
+    writeFileSafe("trade_fail.txt", "no firesignal")
+    return
+  end
+
+  for i = 1, ADD_CLICK_COUNT do
+    pcall(function()
+      firesignal(elixirTab.MouseButton1Click)
+      firesignal(elixirTab.Activated)
+    end)
+    task.wait(ADD_CLICK_DELAY)
+  end
+
+  -- wait UI/server sync
+  task.wait(1.5)
+
+  if not bAdded then
+    logLine("⊘ no elixirs in bag — cancel")
+    pcall(function() R_CANCEL:FireServer() end)
+    connSync:Disconnect(); connPopup:Disconnect()
+    writeFileSafe("trade_empty.txt", MY_NAME)
+    return
+  end
+  logLine("  ✓ elixirs added")
+
+  -- ═══ [4] Lock ═══
+  logLine("[4] Lock")
+  pcall(function() R_LOCK:FireServer(true) end)
+
+  -- wait A lock
+  local t2 = tick()
+  while tick() - t2 < 30 do
+    if aLocked then break end
+    if completed then break end
+    task.wait(0.5)
+  end
+
+  if not aLocked and not completed then
+    logLine("⏱ timeout waiting A lock")
+    pcall(function() R_CANCEL:FireServer() end)
+    connSync:Disconnect(); connPopup:Disconnect()
+    writeFileSafe("trade_timeout.txt", "A no lock")
+    return
+  end
+  logLine("  ✓ A locked")
+
+  -- ═══ [5] Wait completion ═══
+  logLine("[5] Wait completion (5s countdown)")
+  local t3 = tick()
+  while tick() - t3 < 30 do
+    if completed then break end
+    task.wait(0.5)
+  end
+
+  connSync:Disconnect()
+  connPopup:Disconnect()
+
+  if completeMsg == "done" then
+    logLine("✓ TRADE SUCCESS")
+    writeFileSafe("trade_done.txt", MY_NAME .. ":" .. target)
+  elseif completeMsg == "cancelled" then
+    logLine("✗ TRADE CANCELLED")
+    writeFileSafe("trade_fail.txt", "cancelled")
+  else
+    logLine("⏱ completion timeout (may have succeeded)")
+    writeFileSafe("trade_timeout.txt", "no popup")
+  end
+end
+
+-- ============================================================
+-- DISPATCH
+-- ============================================================
+if MY_NAME == receiverName and receiverName ~= "" then
+  runReceiver()
+elseif tradeStart == "1" then
+  runSender()
+else
+  logLine("(farm mode — trade script idle)")
+end
