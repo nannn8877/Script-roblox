@@ -28,7 +28,7 @@ local MY_NAME = LP.Name
 
 -- ═══ Config ═══
 local TRADE_TIMEOUT = 120       -- overall sender timeout
-local ADD_CLICK_COUNT = 5       -- click tab N times
+local ADD_CLICK_COUNT = 30      -- click tab N times (each click adds ~1-2 items)
 local ADD_CLICK_DELAY = 0.2     -- delay between clicks
 local RECEIVER_HEARTBEAT = 10   -- receiver write ready.txt every N sec
 
@@ -357,27 +357,32 @@ local function runSender()
   end
   logLine("  ✓ tab found: " .. foundPath)
 
-  -- Verify firesignal
-  if not firesignal then
-    logLine("❌ executor missing firesignal — try VirtualInputManager fallback")
-    -- fallback: เล็งคลิกผ่าน VIM (อาจไม่ทำงานทุก executor)
-    local VIM = game:GetService("VirtualInputManager")
-    for i = 1, ADD_CLICK_COUNT do
-      local pos = elixirTab.AbsolutePosition + elixirTab.AbsoluteSize / 2
-      pcall(function()
-        VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
-        VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
-      end)
-      task.wait(ADD_CLICK_DELAY)
-    end
-  else
-    -- normal firesignal
-    for i = 1, ADD_CLICK_COUNT do
-      local ok1 = pcall(function() firesignal(elixirTab.MouseButton1Click) end)
-      local ok2 = pcall(function() firesignal(elixirTab.Activated) end)
-      logLine(("  click #%d: MB1=%s Activated=%s"):format(i, tostring(ok1), tostring(ok2)))
-      task.wait(ADD_CLICK_DELAY)
-    end
+  -- ปุ่ม 丹药 ใช้ firesignal ไม่ได้ — ต้อง real touch ผ่าน VirtualInputManager
+  local VIM = game:GetService("VirtualInputManager")
+
+  local function realClick(btn)
+    local pos = btn.AbsolutePosition
+    local size = btn.AbsoluteSize
+    local x = pos.X + size.X / 2
+    local y = pos.Y + size.Y / 2
+    -- ส่ง touch (mobile) — Roblox ใช้ touch events
+    pcall(function()
+      VIM:SendTouchEvent(1, 0, x, y)  -- 0 = touch begin
+      task.wait(0.05)
+      VIM:SendTouchEvent(1, 2, x, y)  -- 2 = touch end
+    end)
+  end
+
+  -- [SWITCH TAB] กด 1 ครั้งเพื่อสลับมาที่ tab 丹药
+  logLine("  → switch to elixir tab (real touch)")
+  realClick(elixirTab)
+  task.wait(1.0)
+
+  -- [ADD ALL] กดเพิ่มอีก N ครั้ง (real touch)
+  for i = 1, ADD_CLICK_COUNT do
+    realClick(elixirTab)
+    logLine(("  add #%d: real-click"):format(i))
+    task.wait(ADD_CLICK_DELAY)
   end
 
   -- wait UI/server sync
