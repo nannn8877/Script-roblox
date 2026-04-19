@@ -170,9 +170,14 @@ local function runReceiver()
     end
   end)
 
-  -- === Listen popup (complete/cancel) ===
-  R_POPUP.OnClientEvent:Connect(function(_, msg)
-    if type(msg) ~= "string" then return end
+  -- === Listen popup (complete/cancel + invite) ===
+  R_POPUP.OnClientEvent:Connect(function(arg1, arg2)
+    -- popup arg = (icon, message) or (message, ?)
+    local msg = ""
+    if type(arg2) == "string" then msg = arg2
+    elseif type(arg1) == "string" then msg = arg1 end
+    if msg == "" then return end
+
     if msg:find("Successful") or msg:find("成功") then
       logLine("✓ trade success with " .. (currentPartner or "?"))
       STATE = "IDLE"
@@ -181,6 +186,23 @@ local function runReceiver()
       logLine("✗ trade cancelled")
       STATE = "IDLE"
       currentPartner = nil
+    elseif STATE == "IDLE" and (msg:find("invited") or msg:find("邀请") or msg:find("trade")) then
+      -- invite popup ทั่วไป (ไม่ใช่ countdown)
+      logLine("← INVITE popup (generic): " .. msg:sub(1, 60))
+      STATE = "ACCEPTING"
+      stateStart = tick()
+    end
+  end)
+
+  -- === AGGRESSIVE: spam fire 申请交易 ว่าง ทุก 2s — accept pending invite ===
+  -- ถ้า server ไม่มี pending → noop / ignored
+  -- ถ้ามี pending invite → server เปิด trade window
+  task.spawn(function()
+    while true do
+      task.wait(2)
+      if STATE == "IDLE" then
+        pcall(function() R_REQUEST:FireServer() end)
+      end
     end
   end)
 
@@ -296,20 +318,17 @@ local function runSender()
   end)
 
   pcall(function() R_REQUEST:FireServer(targetPlayer) end)
+  logLine("  fired 申请交易(target)")
 
-  -- wait trade window opens
-  local t1 = tick()
-  while tick() - t1 < 15 do
-    if tradeOpened then break end
-    task.wait(0.5)
+  -- ✱ ไม่รอ tradeOpened — เผื่อ sync event ไม่มา (race)
+  -- รอ fixed 5s แล้วลุย click + lock เลย
+  -- ถ้า trade ยังไม่เปิด → click + lock จะ noop / fail แต่ไม่ stuck
+  task.wait(5)
+  if tradeOpened then
+    logLine("  ✓ trade opened (sync confirmed)")
+  else
+    logLine("  ⚠ no sync event — proceed anyway")
   end
-  if not tradeOpened then
-    logLine("⏱ timeout waiting A accept")
-    connSync:Disconnect(); connPopup:Disconnect()
-    writeFileSafe("trade_timeout.txt", "A no accept")
-    return
-  end
-  logLine("  ✓ trade opened")
 
   -- ═══ [3] Add elixirs (click 丹药 tab × N) ═══
   logLine("[3] Add elixirs via tab click")
@@ -320,8 +339,8 @@ local function runSender()
     return
   end
 
-  -- WAIT for trade UI to render (สำคัญ — UI ไม่โผล่ทันที)
-  task.wait(2)
+  -- ลด wait — UI น่าจะ render แล้วใน 5s ที่รอ
+  task.wait(0.5)
 
   -- หา elixir tab — ลอง 10 รอบ (UI อาจ render ช้า)
   local elixirTab = nil
