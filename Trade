@@ -115,15 +115,41 @@ local R_REQUEST = getRemote(BASE .. "." .. B_TRADE, "\231\148\179\232\175\183\22
 local R_LOCK    = getRemote(BASE .. "." .. B_TRADE, "\233\148\129\229\174\154\228\186\164\230\152\147")  -- 锁定交易
 local R_CANCEL  = getRemote(BASE .. "." .. B_TRADE, "\229\143\150\230\182\136\228\186\164\230\152\147")  -- 取消交易
 local R_SYNC    = getRemote(BASE .. "." .. B_TRADE, "\228\186\164\230\152\147\230\149\176\230\141\174\229\144\140\230\173\165")  -- 交易数据同步
+local R_ADD     = getRemote(BASE .. "." .. B_TRADE, "\230\150\176\229\162\158\228\186\164\230\152\147\231\137\169\229\147\129")  -- 新增交易物品
 local R_POPUP   = getRemote(BASE .. ".UI", B_UI_POPUP)
 local R_INVITE  = getRemote(BASE .. ".UI", B_UI_INVITE)
+local R_SYNC_ELX = getRemote(BASE .. "." .. B_ELIXIR, "\229\144\140\230\173\165\228\184\185\232\141\175\230\149\176\230\141\174")  -- 同步丹药数据
 
-logLine(("Remotes: req=%s lock=%s sync=%s popup=%s invite=%s"):format(
+logLine(("Remotes: req=%s lock=%s sync=%s add=%s popup=%s invite=%s elxsync=%s"):format(
   tostring(R_REQUEST ~= nil), tostring(R_LOCK ~= nil),
-  tostring(R_SYNC ~= nil), tostring(R_POPUP ~= nil), tostring(R_INVITE ~= nil)))
+  tostring(R_SYNC ~= nil), tostring(R_ADD ~= nil),
+  tostring(R_POPUP ~= nil), tostring(R_INVITE ~= nil),
+  tostring(R_SYNC_ELX ~= nil)))
+
+-- ⚡ Elixir inventory cache — listen ตั้งแต่ early เพื่อจับ initial sync
+local _ELIXIR_INV = {}  -- {uuid = count}
+if R_SYNC_ELX then
+  R_SYNC_ELX.OnClientEvent:Connect(function(data)
+    if type(data) ~= "table" then return end
+    -- log จำนวน item เพื่อ debug
+    local n = 0
+    for _, item in pairs(data) do
+      if type(item) == "table" then
+        local uuid = item["\231\180\162\229\188\149"]  -- 索引
+        local count = item["\230\149\176\233\135\143"]  -- 数量
+        if uuid then
+          _ELIXIR_INV[uuid] = count or 1
+          n = n + 1
+        end
+      end
+    end
+    logLine(("← R_SYNC_ELX: %d items (cache=%d)"):format(n,
+      (function() local c=0; for _ in pairs(_ELIXIR_INV) do c=c+1 end; return c end)()))
+  end)
+end
 
 -- Verify remotes
-if not R_REQUEST or not R_LOCK or not R_SYNC then
+if not R_REQUEST or not R_LOCK or not R_ADD then
   logLine("❌ Missing trade remotes — abort")
   writeFileSafe("trade_fail.txt", "remotes not found")
   return
@@ -166,7 +192,7 @@ local function runReceiver()
     end)
   end
 
-  -- === Listen trade sync ===
+  -- === Listen trade sync (R_SYNC) ===
   R_SYNC.OnClientEvent:Connect(function(data)
     if type(data) ~= "table" then return end
 
@@ -199,6 +225,34 @@ local function runReceiver()
     if STATE == "WAIT_B_LOCK" and partnerId and lockDict[partnerId] == true then
       STATE = "SELF_LOCK"
       logLine("  B locked → self lock")
+    end
+  end)
+
+  -- === Listen R_REQUEST (申请交易) — server fire ตรงนี้ตอน trade เริ่ม ===
+  -- จาก find_sync.txt: arg1=sender_name, arg2=table (trade data)
+  R_REQUEST.OnClientEvent:Connect(function(arg1, arg2)
+    logLine(("← R_REQUEST event: arg1=%s arg2type=%s"):format(
+      tostring(arg1), type(arg2)))
+
+    -- arg1 = sender name → invite!
+    if STATE == "IDLE" and type(arg1) == "string" and arg1 ~= MY_NAME then
+      currentPartner = arg1
+      STATE = "ACCEPTING"
+      stateStart = tick()
+      logLine("← trade invite via R_REQUEST: " .. arg1)
+    end
+
+    -- arg2 = table (trade data) — check lock state
+    if type(arg2) == "table" then
+      local lockDict = arg2[B_LOCK_DICT] or {}
+      for uid, v in pairs(lockDict) do
+        if tostring(uid) ~= myUserId and v == true then
+          if STATE == "WAIT_B_LOCK" then
+            STATE = "SELF_LOCK"
+            logLine("  B locked (via R_REQUEST) → self lock")
+          end
+        end
+      end
     end
   end)
 
@@ -286,6 +340,12 @@ local function runSender()
   -- clear start flag so won't re-run on reconnect
   writeFileSafe("trade_start.txt", "0")
 
+  -- ⏳ Wait extra time for game scripts/PlayerGui to fully initialize
+  -- (autoexec รันก่อน game scripts บางตัว — ต้องรอนาน)
+  logLine("  ⏳ wait 15s for game fully load...")
+  task.wait(15)
+  logLine("  ✓ ready to start sender flow")
+
   local myUserId = tostring(LP.UserId)
 
   -- ═══ [1] Wait for target in Players ═══
@@ -330,70 +390,57 @@ local function runSender()
   task.wait(8)
   logLine("  → assume trade opened")
 
-  -- ═══ [3] Find tab + click ═══
-  logLine("[3] Add elixirs")
-  local gui = LP:WaitForChild("PlayerGui", 10)
-  if not gui then
-    writeFileSafe("trade_fail.txt", "no PlayerGui")
-    connPopup:Disconnect()
-    return
-  end
-  task.wait(2)
+  -- ═══ [3] Direct fire R_ADD per UUID — ไม่ผ่าน UI click! ═══
+  logLine("[3] Add elixirs DIRECTLY via R_ADD per UUID")
 
-  local function findElixirTabFresh()
+  -- Click tab elixir 1 ครั้ง — trigger UI render (เผื่อ server push update)
+  local gui = LP:WaitForChild("PlayerGui", 10)
+  if gui then
+    task.wait(2)
     for _, desc in pairs(gui:GetDescendants()) do
       if (desc:IsA("TextButton") or desc:IsA("ImageButton")) and desc.Name == B_ELIXIR then
         local full = desc:GetFullName()
         if full:find(B_TRADE, 1, true) and full:find(B_MY_BAG, 1, true) then
-          return desc
+          pcall(function() firesignal(desc.Activated) end)
+          logLine("  → click tab elixir (trigger UI)")
+          break
         end
       end
     end
-    return nil
   end
 
-  -- หา tab รอ 10 รอบ
-  local elixirTab
-  for attempt = 1, 10 do
-    elixirTab = findElixirTabFresh()
-    if elixirTab then break end
-    task.wait(1)
+  -- รอ inventory cache ค่อยๆ update
+  logLine("  ⏳ wait 3s for inventory data...")
+  task.wait(3)
+
+  -- Snapshot UUIDs
+  local uuidList = {}
+  for uuid, _ in pairs(_ELIXIR_INV) do
+    table.insert(uuidList, uuid)
   end
+  logLine(("  inventory cache: %d unique elixirs"):format(#uuidList))
 
-  if not elixirTab then
-    logLine("❌ elixir tab not found after 10s")
-    pcall(function() R_CANCEL:FireServer() end)
-    connPopup:Disconnect()
-    writeFileSafe("trade_fail.txt", "no elixir tab")
-    return
-  end
-  logLine("  ✓ tab found")
-
-  -- Switch tab
-  logLine("  → switch to elixir tab")
-  pcall(function() firesignal(elixirTab.Activated) end)
-  task.wait(5.0)
-
-  -- Spam click (re-find every iteration)
-  logLine(("  → spam Add All × %d"):format(ADD_CLICK_COUNT))
-  local clicked = 0
-  for i = 1, ADD_CLICK_COUNT do
-    local btn = findElixirTabFresh()
-    if btn then
-      pcall(function() firesignal(btn.Activated) end)
-      clicked = clicked + 1
+  if #uuidList == 0 then
+    logLine("  ⊘ no elixirs in inventory cache — skip add (will lock empty)")
+  else
+    -- Fire R_ADD per UUID — server validate + add
+    logLine(("  → fire R_ADD × %d UUIDs"):format(#uuidList))
+    local fired = 0
+    for i, uuid in ipairs(uuidList) do
+      local ok = pcall(function()
+        R_ADD:FireServer(B_ELIXIR, uuid, 9999999999)
+      end)
+      if ok then fired = fired + 1 end
+      logLine(("    [%d/%d] uuid=%s ok=%s"):format(i, #uuidList, uuid:sub(1, 8), tostring(ok)))
+      task.wait(0.15)  -- ห่างเล็กน้อย กัน rate limit
     end
-    task.wait(0.1 + math.random() * 0.15)
-    if i % 20 == 0 then
-      logLine(("    .. click %d/%d (success %d)"):format(i, ADD_CLICK_COUNT, clicked))
-    end
+    logLine(("  ✓ fired %d/%d R_ADD"):format(fired, #uuidList))
   end
-  logLine(("  ✓ fired %d/%d clicks"):format(clicked, ADD_CLICK_COUNT))
 
   task.wait(2)
 
   -- ═══ [4] Lock ═══
-  logLine("[4] Lock (blind)")
+  logLine("[4] Lock")
   pcall(function() R_LOCK:FireServer(true) end)
 
   -- ═══ [5] Wait popup completion (NO aLocked check) ═══
