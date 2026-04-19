@@ -28,8 +28,8 @@ local MY_NAME = LP.Name
 
 -- ═══ Config ═══
 local TRADE_TIMEOUT = 120       -- overall sender timeout
-local ADD_CLICK_COUNT = 80      -- click tab N times (proven works @ 0.2s delay)
-local ADD_CLICK_DELAY = 0.2     -- delay between clicks (proven works)
+local ADD_CLICK_COUNT = 60      -- click N times with jitter (Test G pattern)
+local ADD_CLICK_DELAY = 0.2     -- (used as base, real delay = 0.1-0.25 jittered)
 local RECEIVER_HEARTBEAT = 10   -- receiver write ready.txt every N sec
 
 -- ═══ Bytes (UTF-8 chinese strings) ═══
@@ -376,22 +376,25 @@ local function runSender()
   end
   logLine("  ✓ tab found: " .. foundPath)
 
-  -- 🎯 Strategy: switch tab → wait long → spam click
-  -- Click 1 = switch tab จาก default 装备 → 丹药 (UI render รายการยา)
-  -- Wait 2s ให้ UI/server prepare elixir bag
-  -- Click 2-N = add ยา (jam click กัน race)
-  logLine("  → switch to elixir tab (1st click)")
+  -- 🎯 Strategy: switch tab → wait LONG → spam human-like jitter
+  -- Pattern G (proven works): firesignal Activated × N, jitter delay
+  -- Wait long ก่อน spam — UI/server ต้อง render bag elixir เสร็จก่อน
+  logLine("  → switch to elixir tab")
   pcall(function() firesignal(elixirTab.Activated) end)
-  task.wait(2.0)  -- รอ UI render ยานานขึ้น
+  task.wait(5.0)  -- ⏳ wait 5s ให้ UI render bag elixir เสร็จจริง
 
-  logLine("  → spam Add All × " .. ADD_CLICK_COUNT)
+  logLine(("  → human-like spam × %d (jittered)"):format(ADD_CLICK_COUNT))
   for i = 1, ADD_CLICK_COUNT do
     pcall(function() firesignal(elixirTab.Activated) end)
-    task.wait(ADD_CLICK_DELAY)
+    -- jitter 0.1-0.25s — เลียนแบบ manual tap (Pattern G)
+    task.wait(0.1 + math.random() * 0.15)
+    if i % 20 == 0 then
+      logLine(("    .. click %d/%d"):format(i, ADD_CLICK_COUNT))
+    end
   end
   logLine(("  ✓ fired %d clicks"):format(ADD_CLICK_COUNT))
 
-  -- wait UI/server sync (นานขึ้น — ให้ server process ทุก add)
+  -- รอให้ server process ทุก fire ก่อน lock
   task.wait(3)
 
   if bAdded then
