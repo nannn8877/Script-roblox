@@ -304,44 +304,18 @@ local function runSender()
   end
   logLine("  ✓ found " .. target)
 
-  -- ═══ [2] Request trade ═══
+  -- ═══ [2] Request trade (ไม่ rely on sync) ═══
   logLine("[2] Request trade")
-  -- Setup sync listener
-  local state = "REQUESTING"
-  local tradeOpened = false
-  local bAdded = false  -- I added items
-  local aLocked = false
   local completed = false
   local completeMsg = nil
 
-  local connSync = R_SYNC.OnClientEvent:Connect(function(data)
-    if type(data) ~= "table" then return end
-    local pl = data[B_PLAYER_LIST]
-    if type(pl) == "table" and #pl >= 2 then
-      tradeOpened = true
-    end
-    -- check my items added
-    local items = data[B_PLAYER_ITEMS] or {}
-    local myItems = items[myUserId]
-    if type(myItems) == "table" then
-      local elx = myItems[B_ELIXIR]
-      if type(elx) == "table" then
-        local c = 0
-        for _ in pairs(elx) do c = c + 1 end
-        if c > 0 then bAdded = true end
-      end
-    end
-    -- check A locked
-    local lockD = data[B_LOCK_DICT] or {}
-    for uid, v in pairs(lockD) do
-      if tostring(uid) ~= myUserId and v == true then
-        aLocked = true
-      end
-    end
-  end)
+  -- Listen popup เท่านั้น (success/cancel)
+  local connPopup = R_POPUP.OnClientEvent:Connect(function(arg1, arg2)
+    local msg = ""
+    if type(arg2) == "string" then msg = arg2
+    elseif type(arg1) == "string" then msg = arg1 end
+    if msg == "" then return end
 
-  local connPopup = R_POPUP.OnClientEvent:Connect(function(_, msg)
-    if type(msg) ~= "string" then return end
     if msg:find("Successful") or msg:find("成功") then
       completed = true; completeMsg = "done"
     elseif msg:find("Cancel") or msg:find("取消") then
@@ -352,65 +326,20 @@ local function runSender()
   pcall(function() R_REQUEST:FireServer(targetPlayer) end)
   logLine("  fired 申请交易(target)")
 
-  -- ✱ ไม่รอ tradeOpened — เผื่อ sync event ไม่มา (race)
-  -- รอ fixed 5s แล้วลุย click + lock เลย
-  -- ถ้า trade ยังไม่เปิด → click + lock จะ noop / fail แต่ไม่ stuck
-  task.wait(5)
-  if tradeOpened then
-    logLine("  ✓ trade opened (sync confirmed)")
-  else
-    logLine("  ⚠ no sync event — proceed anyway")
-  end
+  -- รอ A accept (fixed 8s — A spam empty fire ทุก 2s)
+  task.wait(8)
+  logLine("  → assume trade opened")
 
-  -- ═══ [3] Add elixirs (click 丹药 tab × N) ═══
-  logLine("[3] Add elixirs via tab click")
+  -- ═══ [3] Find tab + click ═══
+  logLine("[3] Add elixirs")
   local gui = LP:WaitForChild("PlayerGui", 10)
   if not gui then
     writeFileSafe("trade_fail.txt", "no PlayerGui")
-    connSync:Disconnect(); connPopup:Disconnect()
+    connPopup:Disconnect()
     return
   end
+  task.wait(2)
 
-  -- ลด wait — UI น่าจะ render แล้วใน 5s ที่รอ
-  task.wait(0.5)
-
-  -- หา elixir tab — ลอง 10 รอบ (UI อาจ render ช้า)
-  local elixirTab = nil
-  local foundPath
-  for attempt = 1, 10 do
-    for _, desc in pairs(gui:GetDescendants()) do
-      if (desc:IsA("TextButton") or desc:IsA("ImageButton")) and desc.Name == B_ELIXIR then
-        local full = desc:GetFullName()
-        if full:find(B_TRADE, 1, true) and full:find(B_MY_BAG, 1, true) then
-          elixirTab = desc
-          foundPath = full
-          break
-        end
-      end
-    end
-    if elixirTab then break end
-    logLine(("  attempt %d: tab not found, wait 1s"):format(attempt))
-    task.wait(1)
-  end
-
-  if not elixirTab then
-    logLine("❌ elixir tab not found after 10s")
-    -- dump tradeUI for debug
-    for _, d in pairs(gui:GetDescendants()) do
-      if d:IsA("TextButton") and d:GetFullName():find(B_TRADE, 1, true) then
-        logLine("  btn: " .. d:GetFullName():sub(-100))
-      end
-    end
-    pcall(function() R_CANCEL:FireServer() end)
-    connSync:Disconnect(); connPopup:Disconnect()
-    writeFileSafe("trade_fail.txt", "no elixir tab")
-    return
-  end
-  logLine("  ✓ tab found: " .. foundPath)
-
-  -- 🎯 Strategy: switch tab → wait LONG → spam human-like jitter
-  -- Pattern G (proven works): firesignal Activated × N, jitter delay
-  -- ⚠ RE-FIND ปุ่มทุก click — เกม recreate UI ตอน switch tab → ref เก่า dead
   local function findElixirTabFresh()
     for _, desc in pairs(gui:GetDescendants()) do
       if (desc:IsA("TextButton") or desc:IsA("ImageButton")) and desc.Name == B_ELIXIR then
@@ -423,13 +352,30 @@ local function runSender()
     return nil
   end
 
-  -- Switch
-  logLine("  → switch to elixir tab")
-  local switchBtn = findElixirTabFresh()
-  if switchBtn then pcall(function() firesignal(switchBtn.Activated) end) end
-  task.wait(5.0)  -- wait UI render bag
+  -- หา tab รอ 10 รอบ
+  local elixirTab
+  for attempt = 1, 10 do
+    elixirTab = findElixirTabFresh()
+    if elixirTab then break end
+    task.wait(1)
+  end
 
-  logLine(("  → spam Add All × %d (re-find each)"):format(ADD_CLICK_COUNT))
+  if not elixirTab then
+    logLine("❌ elixir tab not found after 10s")
+    pcall(function() R_CANCEL:FireServer() end)
+    connPopup:Disconnect()
+    writeFileSafe("trade_fail.txt", "no elixir tab")
+    return
+  end
+  logLine("  ✓ tab found")
+
+  -- Switch tab
+  logLine("  → switch to elixir tab")
+  pcall(function() firesignal(elixirTab.Activated) end)
+  task.wait(5.0)
+
+  -- Spam click (re-find every iteration)
+  logLine(("  → spam Add All × %d"):format(ADD_CLICK_COUNT))
   local clicked = 0
   for i = 1, ADD_CLICK_COUNT do
     local btn = findElixirTabFresh()
@@ -444,61 +390,31 @@ local function runSender()
   end
   logLine(("  ✓ fired %d/%d clicks"):format(clicked, ADD_CLICK_COUNT))
 
-  -- รอให้ server process ทุก fire ก่อน lock
-  task.wait(3)
-
-  if bAdded then
-    logLine("  ✓ elixirs added")
-  else
-    logLine("  ⊘ no elixirs in bag — lock anyway (empty trade)")
-  end
+  task.wait(2)
 
   -- ═══ [4] Lock ═══
-  logLine("[4] Lock")
+  logLine("[4] Lock (blind)")
   pcall(function() R_LOCK:FireServer(true) end)
 
-  -- wait A lock (60s — A's receiver loop รอ B lock + setup ใช้เวลา)
-  local t2 = tick()
-  while tick() - t2 < 60 do
-    if aLocked then break end
-    if completed then break end
-    task.wait(0.5)
-  end
-
-  if not aLocked and not completed then
-    logLine("⏱ timeout waiting A lock (60s)")
-    pcall(function() R_CANCEL:FireServer() end)
-    connSync:Disconnect(); connPopup:Disconnect()
-    writeFileSafe("trade_timeout.txt", "A no lock")
-    return
-  end
-  logLine("  ✓ A locked (took " .. math.floor(tick() - t2) .. "s)")
-
-  -- ═══ [5] Wait completion ═══
-  logLine("[5] Wait completion (5s countdown)")
+  -- ═══ [5] Wait popup completion (NO aLocked check) ═══
+  logLine("[5] Wait completion popup (60s)")
   local t3 = tick()
-  while tick() - t3 < 30 do
+  while tick() - t3 < 60 do
     if completed then break end
     task.wait(0.5)
   end
 
-  connSync:Disconnect()
   connPopup:Disconnect()
 
   if completeMsg == "done" then
-    if bAdded then
-      logLine("✓ TRADE SUCCESS (with elixirs)")
-      writeFileSafe("trade_done.txt", MY_NAME .. ":" .. target)
-    else
-      logLine("✓ TRADE SUCCESS (empty)")
-      writeFileSafe("trade_empty.txt", MY_NAME .. ":" .. target)
-    end
+    logLine("✓ TRADE SUCCESS")
+    writeFileSafe("trade_done.txt", MY_NAME .. ":" .. target)
   elseif completeMsg == "cancelled" then
     logLine("✗ TRADE CANCELLED")
     writeFileSafe("trade_fail.txt", "cancelled")
   else
-    logLine("⏱ completion timeout (may have succeeded)")
-    writeFileSafe("trade_timeout.txt", "no popup")
+    logLine("⏱ no popup in 60s — assume done")
+    writeFileSafe("trade_done.txt", MY_NAME .. ":" .. target .. ":noPopup")
   end
 end
 
