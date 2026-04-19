@@ -28,8 +28,8 @@ local MY_NAME = LP.Name
 
 -- ═══ Config ═══
 local TRADE_TIMEOUT = 120       -- overall sender timeout
-local ADD_CLICK_COUNT = 40      -- pair-clicks (2 clicks each = 80 total clicks)
-local ADD_CLICK_DELAY = 0.15    -- delay between pair-clicks
+local ADD_CLICK_COUNT = 80      -- click tab N times (proven works @ 0.2s delay)
+local ADD_CLICK_DELAY = 0.2     -- delay between clicks (proven works)
 local RECEIVER_HEARTBEAT = 10   -- receiver write ready.txt every N sec
 
 -- ═══ Bytes (UTF-8 chinese strings) ═══
@@ -376,21 +376,14 @@ local function runSender()
   end
   logLine("  ✓ tab found: " .. foundPath)
 
-  -- ปุ่ม 丹药: firesignal ใช้ได้ แต่ต้อง click 2 ครั้ง/รอบ (1=select, 2=add)
-  -- เพิ่มจำนวนเป็น ADD_CLICK_COUNT*2 เพื่อกัน case ยาเยอะ
-  -- [SWITCH TAB] กดสลับมาที่ tab 丹药 ก่อน
-  logLine("  → switch to elixir tab")
-  pcall(function() firesignal(elixirTab.Activated) end)
-  task.wait(1.0)
-
-  -- [ADD ALL] click pair (2 clicks ติดกัน) × N รอบ
+  -- 🎯 Proven pattern (จาก click_test): firesignal Activated × N (delay 0.2s)
+  -- → fire 新增交易物品 ครั้งละ ~1 ต่อ click → 80 click = 80 fire = ครอบทุกยา
+  logLine("  → click elixir tab × " .. ADD_CLICK_COUNT)
   for i = 1, ADD_CLICK_COUNT do
-    pcall(function() firesignal(elixirTab.Activated) end)
-    task.wait(0.05)
     pcall(function() firesignal(elixirTab.Activated) end)
     task.wait(ADD_CLICK_DELAY)
   end
-  logLine(("  ✓ pressed %d × 2 clicks"):format(ADD_CLICK_COUNT))
+  logLine(("  ✓ fired %d clicks"):format(ADD_CLICK_COUNT))
 
   -- wait UI/server sync
   task.wait(1.5)
