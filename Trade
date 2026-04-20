@@ -387,113 +387,33 @@ local function runSender()
   pcall(function() R_REQUEST:FireServer(targetPlayer) end)
   logLine("  fired 申请交易(target)")
 
-  -- รอ A accept (fixed 8s — A spam empty fire ทุก 2s)
-  task.wait(8)
-  logLine("  → assume trade opened")
+  -- รอ A accept + trade window fully open server-side (นาน — กัน race)
+  task.wait(12)
+  logLine("  → trade should be open both sides now")
 
-  -- ═══ [3] Direct fire R_ADD per UUID — ไม่ผ่าน UI click! ═══
-  logLine("[3] Add elixirs DIRECTLY via R_ADD per UUID")
+  -- ═══ [3] Fire R_ADD ทุก UUID ยาทั้ง 60 ตัว (brute force) ═══
+  -- UUID ของยา = item template ID = เหมือนกันทุก acc
+  -- ยา 12 ระดับ × 5 ชนิด = 60 UUIDs
+  -- Server จะ add เฉพาะที่ acc นี้มี — ที่ไม่มี = noop (safe)
+  logLine("[3] Fire R_ADD × all UUIDs in bank")
 
-  -- Click tab elixir 1 ครั้ง — trigger UI render
-  local gui = LP:WaitForChild("PlayerGui", 10)
+  -- Click tab elixir (optional — trigger UI)
+  local gui = LP:WaitForChild("PlayerGui", 5)
   if gui then
-    task.wait(2)
     for _, desc in pairs(gui:GetDescendants()) do
       if (desc:IsA("TextButton") or desc:IsA("ImageButton")) and desc.Name == B_ELIXIR then
         local full = desc:GetFullName()
         if full:find(B_TRADE, 1, true) and full:find(B_MY_BAG, 1, true) then
           pcall(function() firesignal(desc.Activated) end)
-          logLine("  → click tab elixir (trigger UI render)")
           break
         end
       end
     end
   end
+  task.wait(1)
 
-  -- wait UI render
-  task.wait(3)
-
-  -- Collect UUID from multiple sources
-  local uuidSet = {}
-
-  -- Source 1: R_SYNC_ELX cache (if any)
-  for uuid, _ in pairs(_ELIXIR_INV) do
-    uuidSet[uuid] = "sync"
-  end
-
-  -- Source 2: Scan PlayerGui descendants for UUID
-  if gui then
-    local function looksLikeUUID(s)
-      return type(s) == "string" and #s == 36 and s:sub(9,9) == "-" and s:sub(14,14) == "-" and s:sub(19,19) == "-" and s:sub(24,24) == "-"
-    end
-
-    for _, desc in pairs(gui:GetDescendants()) do
-      local path = desc:GetFullName()
-      -- scan only trade UI elixir items
-      if path:find(B_TRADE, 1, true) and path:find(B_ELIXIR, 1, true) then
-        -- check Name
-        if looksLikeUUID(desc.Name) then
-          uuidSet[desc.Name] = uuidSet[desc.Name] or "gui_name"
-        end
-        -- check attributes
-        local ok, attrs = pcall(function() return desc:GetAttributes() end)
-        if ok and attrs then
-          for _, v in pairs(attrs) do
-            if looksLikeUUID(v) then
-              uuidSet[v] = uuidSet[v] or "gui_attr"
-            end
-          end
-        end
-      end
-    end
-  end
-
-  -- Source 3: getgc deep scan (broader — ทุก table)
-  if getgc then
-    for _, obj in pairs(getgc(true)) do
-      if type(obj) == "table" then
-        for k, v in pairs(obj) do
-          -- key เป็น UUID + value เป็น table + มี 背包类型=丹药
-          if type(k) == "string" and #k == 36 and k:sub(9,9) == "-"
-            and type(v) == "table" then
-            local bt = rawget(v, B_BAGTYPE)
-            if bt == B_ELIXIR then
-              uuidSet[k] = uuidSet[k] or "gc_key"
-            end
-          end
-          -- value = table ที่มี 索引=UUID + 背包类型=丹药
-          if type(v) == "table" then
-            local idx = rawget(v, "\231\180\162\229\188\149")  -- 索引
-            local bt = rawget(v, B_BAGTYPE)
-            if type(idx) == "string" and bt == B_ELIXIR then
-              uuidSet[idx] = uuidSet[idx] or "gc_idx"
-            end
-          end
-        end
-      end
-    end
-  end
-
-  local uuidList = {}
-  for u, src in pairs(uuidSet) do
-    table.insert(uuidList, {uuid=u, src=src})
-  end
-  logLine(("  found UUIDs: %d (sources: see below)"):format(#uuidList))
-
-  -- Fire R_ADD per UUID (ถ้าเจอ)
-  if #uuidList > 0 then
-    logLine(("  → fire R_ADD × %d UUIDs"):format(#uuidList))
-    for i, item in ipairs(uuidList) do
-      local ok = pcall(function()
-        R_ADD:FireServer(B_ELIXIR, item.uuid, 9999999999)
-      end)
-      logLine(("    [%d/%d] %s (%s) ok=%s"):format(i, #uuidList, item.uuid:sub(1,8), item.src, tostring(ok)))
-      task.wait(0.15)
-    end
-  end
-
-  -- Source 4: Fallback UUID bank — ลอง UUID ที่เคยเห็นจาก capture เก่า
-  -- server reject ถ้าไม่ match = noop + ไม่มีผล
+  -- UUID BANK — 60 ยา (12 ระดับ × 5 ชนิด)
+  -- 36 ยืนยันแล้ว + ที่ยังเพิ่มได้จาก elixir_uuids.txt
   local UUID_BANK = {
     "001b88f5-1d4f-46d3-824a-956b67090a74","081ca13d-87d9-42f9-be1b-9d72d18bacdf",
     "0997e094-447e-4689-9ac1-7d07d70797c4","0b0a5ead-f2c2-46b0-a0f1-0103668d2f78",
@@ -514,19 +434,38 @@ local function runSender()
     "cd6dac8d-cb41-49a7-bc74-45964ebd5b8a","dba0f5d0-6350-4e79-b740-fafd3538481c",
     "e2dfff4a-2f13-43b8-9eee-548a6840a3f2","fd775d40-718e-4aa2-94e9-e530b37bbf32",
   }
-  -- ยิง UUID bank เพิ่ม — เผื่อ acc นี้มียาบางตัวใน list
-  logLine(("  → fire R_ADD UUID BANK × %d (fallback, may noop)"):format(#UUID_BANK))
-  local bankFired = 0
-  for _, uuid in ipairs(UUID_BANK) do
-    if not uuidSet[uuid] then  -- skip ถ้ายิงไปแล้ว
-      pcall(function() R_ADD:FireServer(B_ELIXIR, uuid, 9999999999) end)
-      bankFired = bankFired + 1
-      task.wait(0.1)
+
+  -- ถ้ามีไฟล์ elixir_uuids.txt → โหลดเพิ่ม (from uuid_log.lua)
+  local extraFile = "elixir_uuids.txt"
+  if isfile and isfile(extraFile) then
+    local content = readFileSafe(extraFile)
+    local seen = {}
+    for _, u in ipairs(UUID_BANK) do seen[u] = true end
+    for line in content:gmatch("[^\r\n]+") do
+      line = line:gsub("%s+", "")
+      if #line == 36 and not seen[line] then
+        table.insert(UUID_BANK, line)
+        seen[line] = true
+      end
     end
   end
-  logLine(("  ✓ bank fired %d extra UUIDs"):format(bankFired))
 
-  task.wait(2)
+  logLine(("  → fire R_ADD × %d UUIDs (slow mode)"):format(#UUID_BANK))
+  local fired = 0
+  for i, uuid in ipairs(UUID_BANK) do
+    local ok = pcall(function()
+      R_ADD:FireServer(B_ELIXIR, uuid, 9999999999)
+    end)
+    if ok then fired = fired + 1 end
+    task.wait(0.3)  -- ช้าลง — กัน rate limit server
+    if i % 10 == 0 then
+      logLine(("    .. fired %d/%d"):format(i, #UUID_BANK))
+    end
+  end
+  logLine(("  ✓ fired %d/%d UUIDs"):format(fired, #UUID_BANK))
+
+  -- รอ server process ทุก add ก่อน lock (นาน)
+  task.wait(3)
 
   -- ═══ [4] Lock ═══
   logLine("[4] Lock")
