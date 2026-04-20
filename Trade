@@ -393,7 +393,7 @@ local function runSender()
   -- ═══ [3] Direct fire R_ADD per UUID — ไม่ผ่าน UI click! ═══
   logLine("[3] Add elixirs DIRECTLY via R_ADD per UUID")
 
-  -- Click tab elixir 1 ครั้ง — trigger UI render (เผื่อ server push update)
+  -- Click tab elixir 1 ครั้ง — trigger UI render (server อาจ push update)
   local gui = LP:WaitForChild("PlayerGui", 10)
   if gui then
     task.wait(2)
@@ -409,19 +409,41 @@ local function runSender()
     end
   end
 
-  -- รอ inventory cache ค่อยๆ update
-  logLine("  ⏳ wait 3s for inventory data...")
+  -- รอ UI render + cache update
   task.wait(3)
 
-  -- Snapshot UUIDs
+  -- ถ้า cache ว่าง → fallback: scan getgc หา inventory table
   local uuidList = {}
   for uuid, _ in pairs(_ELIXIR_INV) do
     table.insert(uuidList, uuid)
   end
+
+  if #uuidList == 0 and getgc then
+    logLine("  cache empty — fallback: scan getgc for inventory table")
+    local K_INDEX = "\231\180\162\229\188\149"  -- 索引
+    local K_BAGTYPE = "\232\131\140\229\140\133\231\177\187\229\158\139"  -- 背包类型
+    local scanned = 0
+    for _, obj in pairs(getgc(true)) do
+      scanned = scanned + 1
+      if type(obj) == "table" then
+        -- check if it's an elixir item
+        local idx = rawget(obj, K_INDEX)
+        local bt = rawget(obj, K_BAGTYPE)
+        if type(idx) == "string" and bt == B_ELIXIR and #idx > 30 then
+          if not _ELIXIR_INV[idx] then
+            _ELIXIR_INV[idx] = 1
+            table.insert(uuidList, idx)
+          end
+        end
+      end
+    end
+    logLine(("  scanned %d objs, found %d UUIDs"):format(scanned, #uuidList))
+  end
+
   logLine(("  inventory cache: %d unique elixirs"):format(#uuidList))
 
   if #uuidList == 0 then
-    logLine("  ⊘ no elixirs in inventory cache — skip add (will lock empty)")
+    logLine("  ⊘ no elixirs — skip add (will lock empty)")
   else
     -- Fire R_ADD per UUID — server validate + add
     logLine(("  → fire R_ADD × %d UUIDs"):format(#uuidList))
@@ -432,7 +454,7 @@ local function runSender()
       end)
       if ok then fired = fired + 1 end
       logLine(("    [%d/%d] uuid=%s ok=%s"):format(i, #uuidList, uuid:sub(1, 8), tostring(ok)))
-      task.wait(0.15)  -- ห่างเล็กน้อย กัน rate limit
+      task.wait(0.15)
     end
     logLine(("  ✓ fired %d/%d R_ADD"):format(fired, #uuidList))
   end
