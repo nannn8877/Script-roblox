@@ -1,0 +1,304 @@
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "HerbAndMailboxGui"
+screenGui.Parent = playerGui
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 200, 0, 50)
+button.Position = UDim2.new(1, -210, 0.5, -25)
+button.AnchorPoint = Vector2.new(1, 0.5)
+button.Text = "Collect All"
+button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Parent = screenGui
+
+-- =========================
+-- Remote ทั้งหมด
+-- =========================
+
+local herbRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\134\156\231\148\176")
+    :WaitForChild("\233\135\135\233\155\134")
+
+local mailboxRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\233\130\174\228\187\182")
+    :WaitForChild("\233\162\134\229\143\150\229\133\168\233\131\168\233\130\174\228\187\182")
+
+local remote1 = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\149\134\229\186\151")
+    :WaitForChild("\233\147\182\232\161\140")
+    :WaitForChild("\233\162\134\229\143\150\231\144\134\232\180\162")
+
+local remote2 = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\149\134\229\186\151")
+    :WaitForChild("\233\147\182\232\161\140")
+    :WaitForChild("\232\180\173\228\185\176\231\144\134\232\180\162")
+
+local remote3 = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\133\172\228\188\154")
+    :WaitForChild("\230\141\144\231\140\174")
+
+local remoteA = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\230\175\143\230\151\165\228\187\187\229\138\161")
+    :WaitForChild("\233\162\134\229\143\150\229\165\150\229\138\177")
+
+-- 🎰 วงล้อ
+local spinRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\232\189\172\231\155\152")
+    :WaitForChild("\230\138\189\229\165\150") -- สุ่ม
+
+local skipRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\232\189\172\231\155\152")
+    :WaitForChild("\233\162\134\229\165\150") -- skip
+
+local remoteC = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\232\138\130\230\151\165\230\180\187\229\138\168")
+    :WaitForChild("\233\162\134\229\143\150\229\165\150\229\138\177")
+
+local remoteD = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\230\156\136\233\128\154\232\161\140\232\175\129")
+    :WaitForChild("\229\174\140\230\136\144\228\187\187\229\138\161")
+
+local buyRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\133\172\228\188\154")
+    :WaitForChild("\229\133\145\230\141\162")
+
+local refreshRemote = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\133\172\228\188\154")
+    :WaitForChild("\229\136\183\230\150\176\229\133\172\228\188\154\229\149\134\229\186\151")
+
+local remoteArce = ReplicatedStorage
+    :WaitForChild("\228\186\139\228\187\182")
+    :WaitForChild("\229\133\172\231\148\168")
+    :WaitForChild("\229\185\184\232\191\144\232\189\172\231\155\152")
+    :WaitForChild("\232\189\172\231\155\152")
+-- =========================
+-- Bytes จริงจาก debug:
+-- 二级界面 = \228\186\140\231\186\167\231\149\140\233\157\162
+-- 公会     = \229\133\172\228\188\154
+-- 背景     = \232\131\140\230\153\175
+-- 右侧界面 = \229\143\179\228\190\167\231\149\140\233\157\162
+-- 商店     = \229\149\134\229\186\151
+-- 公会币   = \229\133\172\228\188\154\229\184\129
+-- =========================
+
+local function getGuildCoins()
+    local gui = playerGui:FindFirstChild("GUI")
+    if not gui then print("❌ ไม่พบ GUI") return nil end
+
+    local n1 = gui:FindFirstChild("\228\186\140\231\186\167\231\149\140\233\157\162")  -- 二级界面
+    if not n1 then print("❌ ไม่พบ 二级界面") return nil end
+
+    local n2 = n1:FindFirstChild("\229\133\172\228\188\154")                            -- 公会
+    if not n2 then print("❌ ไม่พบ 公会") return nil end
+
+    local n3 = n2:FindFirstChild("\232\131\140\230\153\175")                            -- 背景
+    if not n3 then print("❌ ไม่พบ 背景") return nil end
+
+    local n4 = n3:FindFirstChild("\229\143\179\228\190\167\231\149\140\233\157\162")   -- 右侧界面
+    if not n4 then print("❌ ไม่พบ 右侧界面") return nil end
+
+    local n5 = n4:FindFirstChild("\229\149\134\229\186\151")                            -- 商店
+    if not n5 then print("❌ ไม่พบ 商店") return nil end
+
+    local n6 = n5:FindFirstChild("\229\133\172\228\188\154\229\184\129")                -- 公会币
+    if not n6 then print("❌ ไม่พบ 公会币") return nil end
+
+    -- หา TextLabel ใดๆ ใน 公会币 ที่เป็นตัวเลข
+    for _, child in pairs(n6:GetDescendants()) do
+        if child:IsA("TextLabel") or child:IsA("TextButton") then
+            local txt = tostring(child.Text or "")
+            txt = txt:gsub(",", "")
+            txt = txt:gsub(" ", "")
+            local num = tonumber(txt)
+            if num then
+                print("💰 เหรียญกิล: " .. num)
+                return num
+            end
+        end
+    end
+
+    print("❌ หาตัวเลขเหรียญไม่เจอ")
+    return nil
+end
+
+-- =========================
+-- ซื้อสมุนไพรทุกช่องที่มีเหรียญพอ
+-- =========================
+local function autoBuyHerb()
+    for _, obj in pairs(playerGui:GetDescendants()) do
+        if obj.Name == "\229\136\151\232\161\168"              -- 列表
+            and obj.Parent
+            and obj.Parent.Name == "\229\149\134\229\186\151"  -- 商店
+        then
+            local index = 0
+            local found = false
+
+            for _, child in ipairs(obj:GetChildren()) do
+                if child:IsA("Frame") then
+                    index = index + 1
+                    local nameLabel = child:FindFirstChild("\229\144\141\231\167\176", true)
+                    if nameLabel and nameLabel.Text == "Herb" then
+                        local coins = getGuildCoins()
+                        if coins and coins >= 400 then
+                            print("✅ ช่อง " .. index .. " = Herb | เหรียญ " .. coins .. " → ซื้อ")
+                            buyRemote:FireServer(index)
+                            task.wait(0.2)
+                            found = true
+                        else
+                            print("⛔ ช่อง " .. index .. " = Herb แต่เหรียญไม่พอ (" .. tostring(coins) .. ")")
+                        end
+                    end
+                end
+            end
+
+            if not found then
+                print("ℹ️ ไม่พบสมุนไพร หรือเหรียญไม่พอ")
+            end
+            return
+        end
+    end
+    print("❌ หา 列表 ไม่เจอ")
+end
+
+-- =========================
+-- ซื้อ + รีเฟรช 1 ครั้งถ้าเหรียญยังพอ
+-- =========================
+local function buyHerbWithRefresh()
+    autoBuyHerb()
+    task.wait(0.3)
+
+    local coinsLeft = getGuildCoins()
+    if coinsLeft and coinsLeft >= 400 then
+        print("🔄 เหรียญยังพอ (" .. coinsLeft .. ") → รีเฟรชร้าน")
+        refreshRemote:FireServer()
+        task.wait(1.5)
+        autoBuyHerb()
+    else
+        print("ℹ️ เหรียญไม่พอรีเฟรช (" .. tostring(coinsLeft) .. ") จบการซื้อ")
+    end
+end
+
+-- 🎰 ฟังก์ชันสุ่มวงล้อ + skip
+local function spinWheel()
+    local vec = Vector2.new(494.66546630859375, 69.48560333251953)
+
+    for i = 1, 3 do
+        print("🎰 รอบที่ " .. i)
+
+        -- สุ่มวงล้อ
+        spinRemote:FireServer()
+        task.wait(0.8) -- รอ animation / server
+
+        -- skip
+        skipRemote:FireServer(vec, 5)
+        task.wait(0.3)
+    end
+end
+
+-- =========================
+-- Event เมื่อกดปุ่ม
+-- =========================
+button.MouseButton1Click:Connect(function()
+    button.Text = "Running..."
+    button.BackgroundColor3 = Color3.fromRGB(170, 100, 0)
+
+    local ok, err = pcall(function()
+
+        -- 1. Herb
+        local vec = Vector2.new(654.7196655273438, 178.2879180908203)
+        for _, num in ipairs({1,2,3,4,5}) do
+            herbRemote:FireServer(num, vec)
+            task.wait(0.05)
+        end
+        -- 1.5 Lucky Spin
+
+        for i = 1, 30 do
+            remoteArce:FireServer()
+            task.wait(0.03)
+        end
+
+        -- 2. Mailbox
+        mailboxRemote:FireServer()
+        task.wait(0.1)
+
+        -- 3. Remote1 (1-3)
+        for i = 1, 3 do
+            remote1:FireServer(i)
+            task.wait(0.05)
+        end
+
+        -- 4. Remote2 (1-3)
+        for i = 1, 3 do
+            remote2:FireServer(i)
+            task.wait(0.05)
+        end
+
+        -- 5. Remote3 (5 ครั้ง)
+        for i = 1, 5 do
+            remote3:FireServer()
+            task.wait(0.05)
+        end
+
+        -- 6. Remote A (1-5 แต่ละตัว 3 ครั้ง)
+        local vecA = Vector2.new(643.2603759765625, 306.132568359375)
+        for num = 1, 5 do
+            for _ = 1, 3 do
+                remoteA:FireServer(num, vecA)
+                task.wait(0.05)
+            end
+        end
+
+        -- 7. 🎰 วงล้อ + skip (แทน Remote B เดิม)
+        spinWheel()
+
+        -- 8. Remote C (1-6)
+        for i = 1, 6 do
+            remoteC:FireServer(i)
+            task.wait(0.05)
+        end
+
+        -- 9. Remote D (1-15)
+        for i = 1, 15 do
+            remoteD:FireServer(i)
+            task.wait(0.05)
+        end
+
+      
+    end)
+
+    if not ok then
+        print("❌ Error: " .. tostring(err))
+    end
+
+    button.Text = "Collect All"
+    button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+    print("✅ All Complete")
+end)
