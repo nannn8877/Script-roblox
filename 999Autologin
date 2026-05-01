@@ -9,37 +9,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local USERNAME = tostring(player.Name)
 local IS_DELTA = (type(Delta) ~= "nil") or isfolder("Delta")
 
-local WS_BASE
-if IS_DELTA then
-    WS_BASE = "Workspace/"  -- Delta: /storage/emulated/0/Delta/Workspace/
-else
-    WS_BASE = ""  -- Codex: แต่ละ clone แยก folder อยู่แล้ว
-end
-
--- ไฟล์แยก username (Delta) หรือชื่อเดิม (Codex)
-local function fpath(name)
-    if IS_DELTA then
-        return WS_BASE .. name .. "_" .. USERNAME .. ".txt"
-    else
-        return name .. ".txt"
-    end
-end
-
-local FILE_ALIVE   = fpath("alive")
-local FILE_DAILY   = fpath("daily")
-local FILE_STATS   = fpath("stats")
-local FILE_BASE    = fpath("base")
-
--- trigger: Codex ใช้ login_trigger.txt, Delta ใช้ trigger_username.txt
-local FILE_TRIGGER
-if IS_DELTA then
-    FILE_TRIGGER = WS_BASE .. "trigger_" .. USERNAME .. ".txt"
-else
-    FILE_TRIGGER = "login_trigger.txt"
-end
+-- File names ใช้ชื่อเดิม (ไม่มี suffix _username)
+-- _wsPath() จะ prepend "Cult/<USER>/" ให้เองสำหรับ Delta
+local FILE_ALIVE   = "alive.txt"
+local FILE_DAILY   = "daily.txt"
+local FILE_STATS   = "stats.txt"
+local FILE_BASE    = "base.txt"
+local FILE_TRIGGER = "login_trigger.txt"
 
 print("📂 Executor: " .. (IS_DELTA and "Delta" or "Codex"))
-print("📂 Files: " .. FILE_ALIVE)
+print("📂 User: " .. USERNAME)
 
 -- =========================
 -- Remote ทั้งหมด
@@ -175,28 +154,17 @@ local function getGuildCoins()
 end
 
 -- =========================
--- File helpers (Delta — per-user subfolder Cult/<USER>/)
--- All scripts share the same Delta/Workspace/, so prefix every
--- file path with this user's folder to avoid collisions across pkgs.
+-- File helpers
 -- =========================
-
-local _WS_USER = nil
-local function _wsUser()
-    if _WS_USER then return _WS_USER end
-    local ok, lp = pcall(function() return game:GetService("Players").LocalPlayer end)
-    if ok and lp and lp.Name and lp.Name ~= "" then
-        _WS_USER = lp.Name
-    end
-    return _WS_USER
-end
+-- Delta: ทุก clone share /storage/emulated/0/Delta/Workspace/
+--        → ใส่ subfolder Cult/<USERNAME>/ กัน collision
+-- Codex: per-clone workspace แยกอยู่แล้ว → ใช้ชื่อไฟล์ตรงๆ
 
 local function _wsPath(filename)
-    local u = _wsUser()
-    if not u then return filename end  -- fallback (shouldn't happen at runtime)
-    -- Ensure folder exists (Delta supports makefolder; safe-pcall if not)
+    if not IS_DELTA then return filename end
     pcall(function() if makefolder then makefolder("Cult") end end)
-    pcall(function() if makefolder then makefolder("Cult/" .. u) end end)
-    return "Cult/" .. u .. "/" .. filename
+    pcall(function() if makefolder then makefolder("Cult/" .. USERNAME) end end)
+    return "Cult/" .. USERNAME .. "/" .. filename
 end
 
 local function safeRead(filename)
@@ -246,7 +214,7 @@ local function writeBase()
     local num = parseHerb(herb)
     local val = num and tostring(num) or tostring(herb)
     safeWrite(FILE_BASE, val)
-    print("📦 " .. FILE_BASE .. ": " .. val)
+    print("📦 base.txt: " .. val)
 end
 
 -- =========================
@@ -267,11 +235,11 @@ end
 local function writeDailyFile()
     local content = getUsername() .. "|" .. getToday()
     safeWrite(FILE_DAILY, content)
-    print("📅 " .. FILE_DAILY .. ": " .. content)
+    print("📅 daily.txt: " .. content)
 end
 
 -- =========================
--- login_trigger.txt → trigger.txt
+-- login_trigger.txt
 -- =========================
 
 local function isLoginTriggered()
@@ -429,7 +397,7 @@ end
 
 local function startElixirProducer()
     task.spawn(function()
-        print("⚗️ Elixir Producer started — " .. FILE_STATS)
+        print("⚗️ Elixir Producer started")
         while true do
             local content = safeRead(FILE_STATS)
 
@@ -456,7 +424,7 @@ end
 
 local function startHeartbeat()
     task.spawn(function()
-        print("💓 Heartbeat started — " .. FILE_ALIVE)
+        print("💓 Heartbeat started")
         while true do
             safeWrite(FILE_ALIVE, tostring(os.time()) .. "|" .. getUsername())
             task.wait(30)
@@ -466,12 +434,11 @@ end
 
 -- =========================
 -- Kick trigger — bash เขียน "kick" → Lua เตะตัวเองออก
--- ใช้ตอน daily done ให้ app กลับหน้า home → cookie ใหม่มีผล
 -- =========================
 
 local function startKickWatcher()
     task.spawn(function()
-        print("👢 Kick watcher started — " .. FILE_TRIGGER)
+        print("👢 Kick watcher started")
         while true do
             local content = safeRead(FILE_TRIGGER)
             if content and content:lower():find("kick") then
