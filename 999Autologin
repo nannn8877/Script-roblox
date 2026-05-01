@@ -28,8 +28,15 @@ end
 local FILE_ALIVE   = fpath("alive")
 local FILE_DAILY   = fpath("daily")
 local FILE_STATS   = fpath("stats")
-local FILE_TRIGGER = fpath("trigger")
 local FILE_BASE    = fpath("base")
+
+-- trigger: Codex ใช้ login_trigger.txt, Delta ใช้ trigger_username.txt
+local FILE_TRIGGER
+if IS_DELTA then
+    FILE_TRIGGER = WS_BASE .. "trigger_" .. USERNAME .. ".txt"
+else
+    FILE_TRIGGER = "login_trigger.txt"
+end
 
 print("📂 Executor: " .. (IS_DELTA and "Delta" or "Codex"))
 print("📂 Files: " .. FILE_ALIVE)
@@ -168,17 +175,40 @@ local function getGuildCoins()
 end
 
 -- =========================
--- File helpers
+-- File helpers (Delta — per-user subfolder Cult/<USER>/)
+-- All scripts share the same Delta/Workspace/, so prefix every
+-- file path with this user's folder to avoid collisions across pkgs.
 -- =========================
 
+local _WS_USER = nil
+local function _wsUser()
+    if _WS_USER then return _WS_USER end
+    local ok, lp = pcall(function() return game:GetService("Players").LocalPlayer end)
+    if ok and lp and lp.Name and lp.Name ~= "" then
+        _WS_USER = lp.Name
+    end
+    return _WS_USER
+end
+
+local function _wsPath(filename)
+    local u = _wsUser()
+    if not u then return filename end  -- fallback (shouldn't happen at runtime)
+    -- Ensure folder exists (Delta supports makefolder; safe-pcall if not)
+    pcall(function() if makefolder then makefolder("Cult") end end)
+    pcall(function() if makefolder then makefolder("Cult/" .. u) end end)
+    return "Cult/" .. u .. "/" .. filename
+end
+
 local function safeRead(filename)
-    local ok, content = pcall(function() return readfile(filename) end)
+    local path = _wsPath(filename)
+    local ok, content = pcall(function() return readfile(path) end)
     if ok and content then return content end
     return nil
 end
 
 local function safeWrite(filename, content)
-    pcall(function() writefile(filename, content) end)
+    local path = _wsPath(filename)
+    pcall(function() writefile(path, content) end)
 end
 
 -- =========================
@@ -435,9 +465,31 @@ local function startHeartbeat()
 end
 
 -- =========================
+-- Kick trigger — bash เขียน "kick" → Lua เตะตัวเองออก
+-- ใช้ตอน daily done ให้ app กลับหน้า home → cookie ใหม่มีผล
+-- =========================
+
+local function startKickWatcher()
+    task.spawn(function()
+        print("👢 Kick watcher started — " .. FILE_TRIGGER)
+        while true do
+            local content = safeRead(FILE_TRIGGER)
+            if content and content:lower():find("kick") then
+                print("👢 Kick trigger received — disconnecting")
+                safeWrite(FILE_TRIGGER, "off")
+                player:Kick("Daily swap — reconnecting")
+                return
+            end
+            task.wait(3)
+        end
+    end)
+end
+
+-- =========================
 -- MAIN
 -- =========================
 
 startHeartbeat()
+startKickWatcher()
 runDailyLogin()
 startElixirProducer()
