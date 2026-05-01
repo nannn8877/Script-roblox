@@ -57,14 +57,25 @@ local B_LOCK_DICT = "\231\142\169\229\174\182\233\148\129\229\174\154\229\173\15
 local B_BAGTYPE = "\232\131\140\229\140\133\231\177\187\229\158\139"  -- 背包类型
 
 -- ═══ Helpers ═══
+-- Delta uses ONE shared Workspace folder — prefix all file ops with
+-- "Cult/<USERNAME>/" so each clone has its own state.
+local function _wsPath(filename)
+  if not MY_NAME or MY_NAME == "" then return filename end
+  pcall(function() if makefolder then makefolder("Cult") end end)
+  pcall(function() if makefolder then makefolder("Cult/" .. MY_NAME) end end)
+  return "Cult/" .. MY_NAME .. "/" .. filename
+end
+
 local function readFileSafe(path)
-  if not isfile or not isfile(path) then return "" end
-  local ok, data = pcall(readfile, path)
+  local p = _wsPath(path)
+  if not isfile or not isfile(p) then return "" end
+  local ok, data = pcall(readfile, p)
   return (ok and data) or ""
 end
 
 local function writeFileSafe(path, content)
-  if writefile then pcall(writefile, path, tostring(content or "")) end
+  local p = _wsPath(path)
+  if writefile then pcall(writefile, p, tostring(content or "")) end
 end
 
 local _logBuffer = {}
@@ -74,10 +85,9 @@ local function logLine(msg)
   local line = ("[%s] %s"):format(stamp, msg)
   pcall(function() print("[TRADE] " .. msg) end)
   table.insert(_logBuffer, line)
-  -- เขียนทุกครั้ง — ไม่ append เพื่อกัน race
   pcall(function()
     if writefile then
-      writefile("trade_log.txt", table.concat(_logBuffer, "\n"))
+      writefile(_wsPath("trade_log.txt"), table.concat(_logBuffer, "\n"))
     end
   end)
 end
@@ -437,7 +447,7 @@ local function runSender()
 
   -- ถ้ามีไฟล์ elixir_uuids.txt → โหลดเพิ่ม (from uuid_log.lua)
   local extraFile = "elixir_uuids.txt"
-  if isfile and isfile(extraFile) then
+  if isfile and isfile(_wsPath(extraFile)) then
     local content = readFileSafe(extraFile)
     local seen = {}
     for _, u in ipairs(UUID_BANK) do seen[u] = true end
@@ -450,22 +460,18 @@ local function runSender()
     end
   end
 
-  logLine(("  → fire R_ADD × %d UUIDs (slow mode)"):format(#UUID_BANK))
-  local fired = 0
-  for i, uuid in ipairs(UUID_BANK) do
-    local ok = pcall(function()
-      R_ADD:FireServer(B_ELIXIR, uuid, 9999999999)
-    end)
-    if ok then fired = fired + 1 end
-    task.wait(0.3)  -- ช้าลง — กัน rate limit server
-    if i % 10 == 0 then
-      logLine(("    .. fired %d/%d"):format(i, #UUID_BANK))
-    end
+  logLine(("  → fire R_ADD × %d UUIDs"):format(#UUID_BANK))
+  for i, uid in ipairs(UUID_BANK) do
+    local args = {
+      "\228\184\185\232\141\175",
+      uid,
+      9999999999
+    }
+    game:GetService("ReplicatedStorage"):WaitForChild("\228\186\139\228\187\182"):WaitForChild("\229\133\172\231\148\168"):WaitForChild("\228\186\164\230\152\147"):WaitForChild("\230\150\176\229\162\158\228\186\164\230\152\147\231\137\169\229\147\129"):FireServer(unpack(args))
   end
-  logLine(("  ✓ fired %d/%d UUIDs"):format(fired, #UUID_BANK))
+  logLine(("  ✓ fired %d UUIDs"):format(#UUID_BANK))
 
-  -- รอ server process ทุก add ก่อน lock (นาน)
-  task.wait(3)
+  task.wait(2)
 
   -- ═══ [4] Lock ═══
   logLine("[4] Lock")
