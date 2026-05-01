@@ -1,16 +1,16 @@
-local player = game.Players.LocalPlayer
+HerbAndMailboxGuindMailboxGui player = game.Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "HerbAndMailboxGui"
+screenGui.Name = "FarmWc"
 screenGui.Parent = playerGui
 
 local button = Instance.new("TextButton")
 button.Size = UDim2.new(0, 200, 0, 50)
 button.Position = UDim2.new(1, -210, 0.5, -25)
 button.AnchorPoint = Vector2.new(1, 0.5)
-button.Text = "Collect All"
+button.Text = "Collect and farmwc"
 button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
 button.TextColor3 = Color3.fromRGB(255, 255, 255)
 button.Parent = screenGui
